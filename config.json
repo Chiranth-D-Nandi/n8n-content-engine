@@ -1,0 +1,250 @@
+{
+  "channels": [
+    {
+      "id": "01_ai_facts",
+      "name": "AI Explained",
+      "niche": "artificial intelligence",
+      "search_keywords": [
+        "ChatGPT",
+        "AI tools",
+        "artificial intelligence",
+        "machine learning",
+        "LLM"
+      ],
+      "target_audience": "students and professionals 20-40",
+      "tone": "curious, accessible, fast-paced",
+      "reels_per_day": 1,
+      "content_rules": [
+        "Explain like audience is smart but not technical",
+        "Always include one real world example",
+        "End with why this matters to them personally"
+      ],
+      "video_format": "ai_visuals",
+      "duration_seconds": 60,
+      "voice_preset": "en-US-ChristopherNeural",
+      "caption_style": "bold_white",
+      "kling_duration": 5,
+      "kling_mode": "std"
+    },
+    {
+      "id": "02_self_development",
+      "name": "Daily Discipline",
+      "niche": "self-improvement",
+      "search_keywords": [
+        "discipline",
+        "motivation",
+        "morning routine",
+        "productivity",
+        "self improvement"
+      ],
+      "target_audience": "men 18-35 who want to improve",
+      "tone": "intense, direct, no fluff",
+      "reels_per_day": 1,
+      "content_rules": [
+        "Start with a pain point the audience feels",
+        "Use second person language (you, your)",
+        "End with a challenge not a question"
+      ],
+      "video_format": "ai_visuals",
+      "duration_seconds": 45,
+      "voice_preset": "en-US-GuyNeural",
+      "caption_style": "bold_yellow",
+      "kling_duration": 5,
+      "kling_mode": "std"
+    }
+  ],
+  "caption_styles": {
+    "bold_yellow": {
+      "font": "Arial Black",
+      "font_size": 80,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "center"
+    },
+    "bold_white": {
+      "font": "Arial Black",
+      "font_size": 80,
+      "primary_color": "#FFFFFF",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "center"
+    },
+    "custom_39e8a542": {
+      "font": "Montserrat",
+      "font_size": 47,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 2,
+      "position": "bottom"
+    },
+    "custom_1113079b": {
+      "font": "Montserrat",
+      "font_size": 47,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 2,
+      "position": "bottom"
+    },
+    "custom_638a1013": {
+      "font": "Montserrat",
+      "font_size": 47,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 2,
+      "position": "bottom"
+    },
+    "custom_9f29d8a6": {
+      "font": "Montserrat",
+      "font_size": 45,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_bdbd4a34": {
+      "font": "Montserrat",
+      "font_size": 45,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_6a41a54f": {
+      "font": "Bebas Neue",
+      "font_size": 46,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_d006febd": {
+      "font": "Bebas Neue",
+      "font_size": 46,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_9522ad09": {
+      "font": "Bebas Neue",
+      "font_size": 46,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_e9d61b80": {
+      "font": "Bebas Neue",
+      "font_size": 46,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_9d7b7a8b": {
+      "font": "Bebas Neue",
+      "font_size": 46,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_5e00a3bf": {
+      "font": "Bebas Neue",
+      "font_size": 46,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_bb17a44a": {
+      "font": "Bebas Neue",
+      "font_size": 43,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_b3588b09": {
+      "font": "Bebas Neue",
+      "font_size": 46,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_5aade7e8": {
+      "font": "Montserrat",
+      "font_size": 41,
+      "primary_color": "#FFFF00",
+      "stroke_color": "#000000",
+      "stroke_width": 4,
+      "position": "bottom"
+    },
+    "custom_d6bfda47": {
+      "font": "Trebuchet MS",
+      "font_size": 44,
+      "primary_color": "#FFFF00",
+      "position": "bottom",
+      "bold": true,
+      "italic": true
+    },
+    "custom_9ce8920f": {
+      "font": "Trebuchet MS",
+      "font_size": 44,
+      "primary_color": "#FFFF00",
+      "position": "bottom",
+      "bold": true,
+      "italic": true
+    },
+    "custom_d22f8f91": {
+      "font": "Trebuchet MS",
+      "font_size": 44,
+      "primary_color": "#FFFF00",
+      "position": "bottom",
+      "bold": false,
+      "italic": true
+    },
+    "custom_4716f2d8": {
+      "font": "Trebuchet MS",
+      "font_size": 48,
+      "primary_color": "#FFFF00",
+      "position": "bottom",
+      "bold": false,
+      "italic": true
+    },
+    "custom_7b2c685a": {
+      "font": "Impact",
+      "font_size": 48,
+      "primary_color": "#FF0000",
+      "position": "bottom",
+      "bold": false,
+      "italic": false
+    },
+    "custom_2fbf3217": {
+      "font": "Trebuchet MS",
+      "font_size": 51,
+      "primary_color": "#FFFF00",
+      "position": "bottom",
+      "bold": true,
+      "italic": true
+    },
+    "custom_b808023e": {
+      "font": "Arial",
+      "font_size": 56,
+      "primary_color": "#FFFFFF",
+      "position": "center",
+      "bold": true,
+      "italic": false
+    },
+    "custom_aa90e40f": {
+      "font": "Arial",
+      "font_size": 56,
+      "primary_color": "#FFFFFF",
+      "position": "center",
+      "bold": true,
+      "italic": false
+    }
+  }
+}
