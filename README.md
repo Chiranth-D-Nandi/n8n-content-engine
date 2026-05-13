@@ -12,11 +12,11 @@ A production-grade content automation system that researches trending topics, wr
 
 Pipeline triggered via n8n, running through research, script generation, TTS, CogVideoX inference, subtitle burn-in, and FFmpeg composition:
 
-![Pipeline walkthrough](matiks_walkthrough-ezgif_com-video-to-gif-converter.gif)
+![Pipeline walkthrough](matiks_walkthrough-ezgif.com-video-to-gif-converter.gif)
 
 **n8n workflow (published, tested on localhost:5678):**
 
-![n8n workflow](Screenshot_2026-05-13_125156.png)
+![n8n workflow](Screenshot 2026-05-13 125156.png)
 
 Generated reel samples are available in the `outputs/` folder, organised by channel (`ai_tech`, `animals`, `health_fitness`).
 
@@ -49,7 +49,7 @@ TTS is I/O-bound and video generation is GPU-bound, so they have no dependency o
 - **Video generation:** CogVideoX-2B runs locally via the Hugging Face `diffusers` stack with sequential CPU offload and optional INT8 quantisation (torchao). A semaphore of 1 serialises GPU access.
 - **Subtitles:** faster-whisper produces word-level timestamp-aligned `.srt` files from the TTS audio.
 - **Composition:** FFmpeg overlays subtitles and audio onto the generated video. Windows path escaping conflicts (FFmpeg uses `:` as a filter-graph separator) are resolved by copying subtitle files to a relative path before referencing them.
-- **Job queue:** The Flask API returns a `job_id` immediately on video generation requests. Clients poll `/status/<job_id>` to avoid HTTP timeout on 5–8 minute generation jobs. In production this queue is backed by Redis + Celery.
+- **Job queue:** The Flask API returns a `job_id` immediately on video generation requests. Clients poll `/status/<job_id>` to avoid HTTP timeout on 8-10 minute generation jobs. In production this queue is backed by Redis + Celery.
 - **n8n integration:** Webhooks notify n8n workflows on job completion, tested on localhost:5678.
 - **Dashboard:** Browser-based UI with polling for live job status, channel management, and subtitle style preview.
 
