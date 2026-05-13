@@ -10,13 +10,9 @@ A production-grade content automation system that researches trending topics, wr
 
 **Full walkthrough:** [Google Drive](https://drive.google.com/drive/folders/1fx1sv6j_TeXD5qotVLrLZ_rcugIg37Iq?usp=sharing)
 
-Pipeline triggered via n8n, running through research, script generation, TTS, CogVideoX inference, subtitle burn-in, and FFmpeg composition:
-
-![Pipeline walkthrough](matiks_walkthrough-ezgif.com-video-to-gif-converter.gif)
-
 **n8n workflow (published, tested on localhost:5678):**
 
-![n8n workflow](Screenshot 2026-05-13 125156.png)
+![n8n workflow](<Screenshot 2026-05-13 125156.png>)
 
 Generated reel samples are available in the `outputs/` folder, organised by channel (`ai_tech`, `animals`, `health_fitness`).
 
