@@ -47,7 +47,7 @@ Thumbs.db
 
 # Project specific
 temp/
-outputs/
+
 inbox/
 .aicp/
 aicp/
