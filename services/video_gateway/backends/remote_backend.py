@@ -129,13 +129,21 @@ class RemoteGpuVideoBackend(VideoBackend):
         client = self._get_client()
         if client is not None:
             try:
-                # Call Gradio Space API
-                job = client.submit(
-                    prompt,
-                    num_frames,
-                    num_inference_steps,
-                    api_name="/generate_reel_video"
-                )
+                # Call Gradio Space API: try official /generate endpoint first, fallback to /generate_reel_video
+                try:
+                    job = client.submit(
+                        prompt,
+                        num_inference_steps,
+                        6.0,
+                        api_name="/generate"
+                    )
+                except Exception:
+                    job = client.submit(
+                        prompt,
+                        num_frames,
+                        num_inference_steps,
+                        api_name="/generate_reel_video"
+                    )
                 
                 # Poll status
                 while not job.done():
@@ -143,7 +151,23 @@ class RemoteGpuVideoBackend(VideoBackend):
                     status = job.status()
                     logger.debug(f"[ZeroGPU] Status: {status.code}")
 
-                video_result_path = job.result()
+                raw_result = job.result()
+                video_result_path = None
+                if isinstance(raw_result, (list, tuple)):
+                    for item in raw_result:
+                        if isinstance(item, str) and (item.endswith(".mp4") or Path(item).is_file()):
+                            video_result_path = item
+                            break
+                        elif isinstance(item, dict) and "video" in item and item["video"]:
+                            video_result_path = item["video"]
+                            break
+                    if not video_result_path and raw_result:
+                        video_result_path = raw_result[0]
+                elif isinstance(raw_result, dict) and "video" in raw_result:
+                    video_result_path = raw_result["video"]
+                else:
+                    video_result_path = raw_result
+
                 if video_result_path and Path(video_result_path).exists():
                     shutil.copy2(video_result_path, output_path)
                 else:
