@@ -720,6 +720,11 @@ async function checkApi() {
       el.style.color = 'var(--green)';
       dot.style.background = 'var(--green)';
       document.getElementById('job-count').textContent = result.jobs || 0;
+      const bEl = document.getElementById('backend-status');
+      if (bEl && result.video_backend) {
+        bEl.textContent = result.video_backend;
+        bEl.style.color = result.video_backend === 'REAL_REMOTE' ? 'var(--green)' : 'var(--yellow)';
+      }
     } else {
       throw new Error('bad response');
     }
@@ -734,7 +739,7 @@ async function checkApi() {
     const readyResult = await api('GET', '/health/ready');
     const bEl = document.getElementById('backend-status');
     if (bEl && readyResult) {
-      const mode = readyResult.video_backend_mode || 'MOCK';
+      const mode = readyResult.video_backend || readyResult.video_backend_mode || readyResult?.video_gateway?.backend || 'MOCK';
       bEl.textContent = mode;
       if (mode === 'REAL_REMOTE') {
         bEl.style.color = 'var(--green)';
@@ -1671,7 +1676,7 @@ document.addEventListener('DOMContentLoaded', () => {
     api('GET', '/health/ready').then(readyResult => {
       const bEl = document.getElementById('backend-status');
       if (bEl && readyResult) {
-        const mode = readyResult.video_backend_mode || 'MOCK';
+        const mode = readyResult.video_backend || readyResult.video_backend_mode || readyResult?.video_gateway?.backend || 'MOCK';
         bEl.textContent = mode;
         if (mode === 'REAL_REMOTE') {
           bEl.style.color = 'var(--green)';
