@@ -1,35 +1,48 @@
 # Matiks Content Engine - Python Dependencies
 
-# ── Web Framework ──────────────────────────────────────
+# ── Web Framework & Production Server ──────────────────────
 flask>=3.0.0
 flask-cors>=4.0.0
+gunicorn>=21.2.0
 python-dotenv>=1.0.0
+pydantic>=2.0.0
 
-# ── Google APIs ────────────────────────────────────────
+# ── Asynchronous Tasks & Message Queue ─────────────────────
+celery>=5.3.0
+redis>=5.0.0
+
+# ── Observability & Telemetry ──────────────────────────────
+prometheus-client>=0.20.0
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-instrumentation-flask>=0.45b0
+opentelemetry-instrumentation-celery>=0.45b0
+
+# ── ML Gateway & Remote ZeroGPU Client ─────────────────────
+gradio_client>=1.0.0
+
+# ── Google APIs & LLM ──────────────────────────────────────
 google-api-python-client>=2.0.0
 google-genai>=1.0.0
 
-# ── AI / ML ────────────────────────────────────────────
-torch>=2.1.0
-diffusers>=0.27.0
-transformers>=4.38.0
-accelerate>=0.27.0
-faster-whisper>=0.10.0
-
-# ── Video / Audio ──────────────────────────────────────
+# ── Video, Audio & Subtitles ───────────────────────────────
 edge-tts>=6.1.16
 imageio[ffmpeg]>=2.34.0
+faster-whisper>=0.10.0
 
-# ── Research / Scraping ────────────────────────────────
+# ── Research & Scraping ────────────────────────────────────
 isodate>=0.6.1
 pytrends>=4.9.2
 feedparser>=6.0.10
 
-# ── Utilities ──────────────────────────────────────────
+# ── Utilities ──────────────────────────────────────────────
 httpx>=0.25.2
 requests>=2.31.0
-python-dotenv>=1.0.0
 PyJWT>=2.8.0
 
-# ── Optional: INT8 quantization for CogVideoX ──────────
+# ── Optional: Local PyTorch & Diffusion (For Local RTX 4060) ──
+# torch>=2.1.0
+# diffusers>=0.27.0
+# transformers>=4.38.0
+# accelerate>=0.27.0
 # torchao>=0.3.0
