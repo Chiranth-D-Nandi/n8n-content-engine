@@ -26,9 +26,13 @@ def create_app(config_override: dict = None) -> Flask:
     """
     Application Factory Pattern for Matiks Content Engine.
     """
+    project_root = Path(__file__).resolve().parent.parent
+    dashboard_dir = project_root / "dashboard"
+    outputs_base_dir = project_root / "outputs"
+
     app = Flask(
         __name__,
-        static_folder=str(Path("dashboard").resolve()),
+        static_folder=str(dashboard_dir),
         static_url_path="/dashboard/static"
     )
     
@@ -110,11 +114,15 @@ def create_app(config_override: dict = None) -> Flask:
     @app.route("/")
     @app.route("/dashboard")
     def dashboard():
-        return send_from_directory("dashboard", "index.html")
+        return send_from_directory(str(dashboard_dir), "index.html")
+
+    @app.route("/dashboard/<path:filename>")
+    def dashboard_static(filename: str):
+        return send_from_directory(str(dashboard_dir), filename)
 
     @app.route("/outputs/<channel_id>/<filename>")
     def serve_output_file(channel_id: str, filename: str):
-        outputs_dir = Path("outputs") / channel_id
-        return send_from_directory(str(outputs_dir.resolve()), filename)
+        outputs_dir = outputs_base_dir / channel_id
+        return send_from_directory(str(outputs_dir), filename)
 
     return app
