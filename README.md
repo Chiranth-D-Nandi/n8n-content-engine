@@ -1,6 +1,7 @@
 # Matiks Content Engine — Production-Grade Asynchronous ML System
 
-[![Continuous Integration](https://github.com/chiranth-nandi/n8n-content-engine/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7.svg)](https://n8n-content-engine-xt5c.onrender.com/)
+[![Continuous Integration](https://github.com/Chiranth-D-Nandi/n8n-content-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Chiranth-D-Nandi/n8n-content-engine/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![Docker Compose](https://img.shields.io/badge/docker--compose-ready-2496ED.svg)](docker-compose.yml)
 [![BentoML 1.4](https://img.shields.io/badge/BentoML-1.4-00A4A6.svg)](https://bentoml.com/)
@@ -8,6 +9,36 @@
 [![Zero-Cost Infra](https://img.shields.io/badge/Cost-%E2%82%B90%20%2F%20%240-brightgreen.svg)](#zero-cost-hosting-architecture)
 
 > **Automated short-form video generation pipeline**: Transforms trending research signals into high-retention social media reels through LLM scriptwriting, asynchronous speech synthesis, isolated ML inference services (BentoML + Hugging Face ZeroGPU CogVideoX-2B), dynamic ASS subtitle animation, and FFmpeg composition — fully orchestrated via **Redis + Celery**, monitored with **Prometheus, Grafana & OpenTelemetry**, and triggered via **n8n** or an interactive WebGL dashboard.
+
+---
+
+## 🌐 Live Production Deployment
+
+The entire system is deployed live on online cloud infrastructure with authentic ML GPU inference enabled:
+
+| Service | Endpoint / URL | Status | Description |
+| :--- | :--- | :--- | :--- |
+| **Interactive Web UI** | **[https://n8n-content-engine-xt5c.onrender.com/](https://n8n-content-engine-xt5c.onrender.com/)** | `LIVE` | Interactive Three.js WebGL dashboard with real-time status |
+| **Production API Gateway** | **[https://n8n-content-engine-xt5c.onrender.com/health](https://n8n-content-engine-xt5c.onrender.com/health)** | `HTTP 200` | Automated health probe (`video_backend: REAL_REMOTE`) |
+| **Readiness Probe** | **[https://n8n-content-engine-xt5c.onrender.com/health/ready](https://n8n-content-engine-xt5c.onrender.com/health/ready)** | `HTTP 200` | Subsystem check across DB, task queue, and video gateway |
+| **Prometheus Metrics** | **[https://n8n-content-engine-xt5c.onrender.com/metrics](https://n8n-content-engine-xt5c.onrender.com/metrics)** | `ACTIVE` | Scrapes HTTP durations, in-flight requests, and queue length |
+| **Remote GPU Inference** | `https://zai-org-cogvideox-2b-space.hf.space` | `CONNECTED` | Official Hugging Face ZeroGPU Space (48GB VRAM RTX 6000 Ada) |
+
+---
+
+## 🖥️ Live Dashboard Showcase
+
+The web client is a standalone, high-performance WebGL dashboard styled with custom Three.js GridScan shaders, real-time connection status monitoring, dynamic channel management, and an inline video preview player.
+
+| 1. Generate Reel & Subtitle Customizer | 2. Dynamic Channel Manager |
+| :---: | :---: |
+| [![Generate Reel](assets/dashboard_generate.png)](assets/dashboard_generate.png) | [![Channel Manager](assets/dashboard_channels.png)](assets/dashboard_channels.png) |
+| *Real-time Three.js 3D GridScan tunnel, subtitle customization (fonts, size, colors, position), and `REAL_REMOTE` GPU backend badge.* | *11 pre-configured channel niches with custom persona rules, voice models, and quick-generate controls.* |
+
+| 3. Asynchronous Job Monitor | 4. Webhook & Observability Settings |
+| :---: | :---: |
+| [![Job Monitor](assets/dashboard_jobs.png)](assets/dashboard_jobs.png) | [![Settings & Observability](assets/dashboard_settings.png)](assets/dashboard_settings.png) |
+| *Real-time polling of pipeline execution stages (Research → Script → TTS → Video → Subtitles → Composition).* | *Live n8n webhook routing, dynamic API base, connection diagnostics, and links to Prometheus/Grafana.* |
 
 ---
 
@@ -270,7 +301,7 @@ n8n-content-engine/
 
 1. **Clone and Install Dependencies:**
    ```bash
-   git clone https://github.com/chiranth-nandi/n8n-content-engine.git
+   git clone https://github.com/Chiranth-D-Nandi/n8n-content-engine.git
    cd n8n-content-engine
    python -m venv venv
    source venv/bin/activate  # Or `venv\Scripts\activate` on Windows
