@@ -669,7 +669,9 @@
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────
-let API_BASE = 'http://localhost:5000';
+let API_BASE = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http')) 
+  ? window.location.origin 
+  : 'http://localhost:5000';
 let channels = [];
 let currentEditChannelId = null;
 
@@ -1578,6 +1580,15 @@ void main(){
 
 // ── INIT ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.location && window.location.origin && window.location.origin.startsWith('http')) {
+    API_BASE = window.location.origin;
+    const apiInput = document.getElementById('api-url');
+    if (apiInput) apiInput.value = API_BASE;
+    const webhookInput = document.getElementById('webhook-url');
+    if (webhookInput && webhookInput.value.includes('localhost:5678')) {
+      webhookInput.value = `${API_BASE}/webhook/matiks-reel`;
+    }
+  }
   initGridScan();
   checkApi();
   loadChannels();
