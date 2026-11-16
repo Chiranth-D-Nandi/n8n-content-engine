@@ -1,0 +1,78 @@
+name: Continuous Integration & Engineering Quality
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test-and-verify:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run Pytest Test Suite
+        env:
+          DATABASE_PATH: ":memory:"
+          VIDEO_BACKEND: "MOCK"
+          CELERY_ALWAYS_EAGER: "true"
+        run: |
+          python -m pytest tests/ -v --durations=10
+
+      - name: Run Load Benchmark (Mock Backend)
+        env:
+          DATABASE_PATH: ":memory:"
+          VIDEO_BACKEND: "MOCK"
+          CELERY_ALWAYS_EAGER: "true"
+        run: |
+          python tests/locust/run_benchmark.py
+
+      - name: Verify Performance Artifacts Generated
+        run: |
+          test -f tests/locust/benchmark_results_stats.csv
+          test -f tests/locust/PERFORMANCE_REPORT.md
+
+  docker-syntax-check:
+    name: Dockerfile Build & Syntax Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate API Dockerfile
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          push: false
+          tags: matiks-api:ci-test
+
+      - name: Validate Video Gateway Dockerfile
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.video_gateway
+          push: false
+          tags: matiks-video-gateway:ci-test

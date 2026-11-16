@@ -1,0 +1,9 @@
+service: "service:WhisperService"
+labels:
+  owner: content-engine
+  project: n8n-content-engine
+python:
+  packages:
+    - faster-whisper>=0.10.0
+    - bentoml>=1.2.0
+    - pydantic>=2.0.0

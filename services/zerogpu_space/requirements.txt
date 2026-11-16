@@ -1,0 +1,7 @@
+diffusers>=0.30.0
+transformers>=4.44.0
+accelerate>=0.33.0
+torch>=2.4.0
+imageio[ffmpeg]>=2.34.0
+gradio>=4.40.0
+numpy

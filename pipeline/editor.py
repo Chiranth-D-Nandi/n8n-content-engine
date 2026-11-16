@@ -128,34 +128,9 @@ class VideoEditor:
         audio_path: Path
     ) -> list:
         try:
-            from faster_whisper import WhisperModel
-            model = WhisperModel(
-                'base',
-                device='cpu',
-                compute_type='int8'
-            )
-            segments, info = model.transcribe(
-                str(audio_path),
-                word_timestamps=True,
-                language='en'
-            )
-            words = []
-            for segment in segments:
-                if segment.words is None:
-                    continue
-                for word in segment.words:
-                    words.append({
-                        'text': word.word.strip(),
-                        'start': round(word.start, 3),
-                        'end': round(word.end, 3)
-                    })
-            print(f"  [Whisper] Transcribed {len(words)} words")
-            return words
-
-        except ImportError:
-            print("  [Whisper] faster-whisper not installed")
-            print("  Run: pip install faster-whisper")
-            return []
+            from services.whisper_service.client import WhisperClient
+            client = WhisperClient()
+            return client.transcribe(audio_path=audio_path, language='en')
         except Exception as e:
             print(f"  [Whisper] Error: {e}")
             return []

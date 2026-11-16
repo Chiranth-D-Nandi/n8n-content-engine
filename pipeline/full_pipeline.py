@@ -1,20 +1,23 @@
-
-
 import asyncio
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 
-import torch
-
-from pipeline.cogvideo import CogVideoXGenerator
+from app.core.config import settings
+from app.core.logging import logger
+from services.video_gateway.gateway import VideoGenerationGateway
+from services.whisper_service.client import WhisperClient
 from pipeline.editor import VideoEditor, EditJob
 from pipeline.generator import ContentGenerator
 from pipeline.llm import GeminiClient
 from research.aggregator import TrendAggregator
 from database.db import MatiksDatabase
+from observability.metrics import (
+    STAGE_DURATION_SECONDS,
+    JOB_DURATION_SECONDS,
+)
 
 
 @dataclass
@@ -35,6 +38,7 @@ class ReelJob:
     final_path: Optional[Path] = None
     errors: list = field(default_factory=list)
     start_time: float = field(default_factory=time.time)
+    backend_used: Optional[str] = None
 
     def elapsed(self) -> str:
         secs = int(time.time() - self.start_time)
@@ -52,33 +56,30 @@ class ReelJob:
 class FullPipeline:
     """
     Orchestrates all stages to produce a complete reel.
+    Refactored to use Pluggable Video Gateway and Whisper Client.
     """
 
     def __init__(self, config: dict):
         self.config = config
-        apis = config['apis']
+        apis = config.get("apis", {})
 
-        self.db = MatiksDatabase()
+        self.db = MatiksDatabase(settings.DATABASE_PATH)
         self.aggregator = TrendAggregator(config, self.db)
         self.llm = GeminiClient(
-            api_key=apis['gemini_api_key']
+            api_key=apis.get("gemini_api_key") or settings.GEMINI_API_KEY or "dummy_key"
         )
-        self.generator = ContentGenerator(
-            self.llm, self.db, self.aggregator
-        )
+        self.generator = ContentGenerator(self.llm, self.db, self.aggregator)
 
-        # Video generation: CogVideoX local only - no fallback
-        self.cogvideo = CogVideoXGenerator()
+        # Video generation through Pluggable Gateway
+        self.video_gateway = VideoGenerationGateway()
+        self.whisper_client = WhisperClient()
         self.editor = VideoEditor(config)
 
-        for d in ['temp', 'outputs', 'inbox', 'assets/music']:
-            Path(d).mkdir(exist_ok=True)
+        for d in ["temp", "outputs", "inbox", "assets/music"]:
+            Path(d).mkdir(parents=True, exist_ok=True)
 
-        # Pre-load CogVideoX model
-        print("[Pipeline] Pre-loading CogVideoX model...")
-        print("[Pipeline] First run downloads ~16GB from HuggingFace")
-        self.cogvideo.load_model()
-        print("[Pipeline] CogVideoX ready ✅")
+        backend_status = self.video_gateway.get_status()
+        print(f"[Pipeline] Video Gateway active: {backend_status.get('backend')} ({backend_status.get('status')}) ✅")
 
     async def produce_reel(
         self,
@@ -95,33 +96,32 @@ class FullPipeline:
 
         # ── STAGE 1: Research + Script ─────────────────────
         print("\n  📊 STAGE 1: Research + Script Generation")
-        job = await self._stage_research_and_script(
-            job, channel, user_keyword
-        )
+        s1_start = time.time()
+        job = await self._stage_research_and_script(job, channel, user_keyword)
         if job.script is None:
             print("  ❌ Script generation failed. Stopping job.")
             return job
+        STAGE_DURATION_SECONDS.labels(stage="research_and_script").observe(time.time() - s1_start)
         print(f"  ✅ Script ready")
 
         # ── STAGE 2: Audio + Video in PARALLEL ─────────────
         print("\n  🎙 STAGE 2: Audio + Video Generation (parallel)")
-        print("     Audio: edge-tts → voice.mp3")
-        print("     Video: CogVideoX local → background.mp4")
+        s2_start = time.time()
         job = await self._stage_audio_and_video_parallel(job, channel)
 
-        # Hard stop: if video failed, do not proceed
         if job.video_path is None:
             print("  ❌ Video generation failed. Cannot produce reel without AI video.")
             print("     Errors:", job.errors)
             return job
 
-        # Hard stop: if audio failed, do not proceed
         if job.audio_path is None:
             print("  ❌ Audio generation failed. Cannot produce reel without voiceover.")
             return job
+        STAGE_DURATION_SECONDS.labels(stage="audio_and_video").observe(time.time() - s2_start)
 
         # ── STAGE 3: Subtitles ──────────────────────────────
         print("\n  📝 STAGE 3: Subtitle Generation")
+        s3_start = time.time()
         edit_job = EditJob(
             job_id=job.job_id,
             channel_id=job.channel_id,
@@ -132,10 +132,13 @@ class FullPipeline:
         )
         edit_job = await self.editor._generate_subtitles(edit_job, channel)
         job.subtitle_path = edit_job.subtitle_path
+        STAGE_DURATION_SECONDS.labels(stage="subtitles_generation").observe(time.time() - s3_start)
 
         # ── STAGE 4: Final Composition ──────────────────────
         print("\n  🎞 STAGE 4: Video Composition")
+        s4_start = time.time()
         job = await self._stage_compose(job, channel)
+        STAGE_DURATION_SECONDS.labels(stage="composition").observe(time.time() - s4_start)
 
         # ── DONE ────────────────────────────────────────────
         elapsed = job.elapsed()
@@ -158,17 +161,17 @@ class FullPipeline:
         try:
             research = await self.aggregator.research_niche(
                 niche=job.niche,
-                keywords=channel['search_keywords'],
+                keywords=channel.get("search_keywords", [job.niche]),
                 genre=channel,
                 user_keyword=user_keyword
             )
             briefing = self.aggregator.build_llm_briefing(research)
 
             topic_data = {
-                'topic': job.topic,
-                'angle': 'From live trend research',
-                'hook_type': 'curiosity_gap',
-                'inspired_by': briefing[:100]
+                "topic": job.topic,
+                "angle": "From live trend research",
+                "hook_type": "curiosity_gap",
+                "inspired_by": briefing[:100]
             }
 
             script = await self.generator.generate_script(
@@ -177,7 +180,7 @@ class FullPipeline:
             job.script = script
 
         except Exception as e:
-            job.log_error('ResearchAndScript', e)
+            job.log_error("ResearchAndScript", e)
 
         return job
 
@@ -186,12 +189,7 @@ class FullPipeline:
         job: ReelJob,
         channel: dict
     ) -> ReelJob:
-        """
-        Run audio and video generation at the same time.
-
-        NOTE: asyncio.gather runs both coroutines concurrently.
-        _generate_video uses asyncio.to_thread so CUDA stays in one thread.
-        """
+        """Run audio and video generation concurrently."""
         audio_task = self._generate_audio(job, channel)
         video_task = self._generate_video(job, channel)
 
@@ -204,19 +202,19 @@ class FullPipeline:
         audio_result, video_result = results
 
         if isinstance(audio_result, Exception):
-            job.log_error('Audio', audio_result)
+            job.log_error("Audio", audio_result)
         elif isinstance(audio_result, Path):
             job.audio_path = audio_result
             print(f"  ✅ Audio: {audio_result.name}")
 
         if isinstance(video_result, Exception):
-            # Surface the error - no silent fallback
-            job.log_error('Video', video_result)
-            print(f"  ❌ CogVideoX generation failed: {video_result}")
-            # video_path stays None → produce_reel will stop here
-        elif isinstance(video_result, Path):
-            job.video_path = video_result
-            print(f"  ✅ Video: {video_result.name}")
+            job.log_error("Video", video_result)
+            print(f"  ❌ Video generation failed: {video_result}")
+        elif isinstance(video_result, tuple):
+            v_path, v_meta = video_result
+            job.video_path = v_path
+            job.backend_used = v_meta.get("backend")
+            print(f"  ✅ Video: {v_path.name} (Backend: {job.backend_used})")
 
         return job
 
@@ -228,10 +226,10 @@ class FullPipeline:
         """Generate voiceover using edge-tts."""
         import edge_tts
 
-        voice = channel.get('voice_preset', 'en-US-ChristopherNeural')
+        voice = channel.get("voice_preset", "en-US-ChristopherNeural")
         script = job.script
 
-        full_text = script.get('full_script', '')
+        full_text = script.get("full_script", "")
         if not full_text:
             full_text = (
                 f"{script.get('hook', '')}. "
@@ -248,63 +246,33 @@ class FullPipeline:
         self,
         job: ReelJob,
         channel: dict
-    ) -> Path:
-        """
-        Generate background video using CogVideoX locally.
-        NO fallback. If this fails, the reel fails.
-
-        FIX: Use asyncio.to_thread() so the synchronous CUDA call
-        doesn't block the event loop. The CUDA context is kept in
-        the same OS thread (to_thread uses a thread pool, and since
-        CogVideoX is a singleton, the context follows the model).
-        """
-        video_prompt = job.script.get('video_prompt', '')
+    ) -> tuple[Path, dict]:
+        """Generate video background through Video Gateway."""
+        video_prompt = job.script.get("video_prompt", "")
         if not video_prompt:
-            raise ValueError(
-                "Script has no video_prompt field. "
-                "Check that Gemini returned a complete script JSON."
-            )
+            raise ValueError("Script has no video_prompt field.")
 
         output_path = Path(f"temp/{job.job_id}_video.mp4")
 
-        try:
-            # FIX: asyncio.to_thread wraps the synchronous CogVideoX call
-            # This prevents blocking the event loop during the 15-25 min generation
-            result = await asyncio.to_thread(
-                self.cogvideo.generate_video,
-                video_prompt,
-                output_path
-            )
-            return result
-
-        except torch.cuda.OutOfMemoryError:
-            torch.cuda.empty_cache()
-            raise RuntimeError(
-                "GPU out of memory during CogVideoX generation. "
-                "Close other GPU applications and retry. "
-                "No fallback video will be used."
-            )
+        result = await asyncio.to_thread(
+            self.video_gateway.generate_video,
+            prompt=video_prompt,
+            output_path=output_path,
+            num_frames=49,
+            num_inference_steps=30
+        )
+        return Path(result.video_path), result.dict()
 
     async def _stage_compose(
         self,
         job: ReelJob,
         channel: dict
     ) -> ReelJob:
-        """
-        Compose final reel using FFmpeg.
-
-        FIX: Only _compose_with_video path exists now.
-        If job.video_path is None (should not reach here due to
-        early exit in produce_reel), log error and return incomplete.
-        """
+        """Compose final reel using FFmpeg."""
         if not job.video_path or not job.video_path.exists():
             job.log_error(
-                'Compose',
-                RuntimeError(
-                    "No AI-generated video file available. "
-                    "CogVideoX must succeed before composition. "
-                    "No fallback background will be used."
-                )
+                "Compose",
+                RuntimeError("No video file available for composition.")
             )
             return job
 
@@ -323,7 +291,6 @@ class FullPipeline:
                 subtitle_path=job.subtitle_path
             )
 
-            # Always compose with the AI-generated video
             edit_job = await asyncio.to_thread(
                 self.editor._compose_with_video,
                 edit_job,
@@ -334,33 +301,31 @@ class FullPipeline:
             job.errors.extend(edit_job.errors)
 
         except Exception as e:
-            job.log_error('Compose', e)
+            job.log_error("Compose", e)
 
         return job
 
     async def run_all_channels(self) -> list:
         """Process all channels."""
-        channels = self.config['channels']
-        user_keyword = self.config.get('user_keyword', '')
+        channels = self.config["channels"]
+        user_keyword = self.config.get("user_keyword", "")
 
         all_jobs = []
         job_counter = 1
 
         print(f"\n  🚀 Starting pipeline for {len(channels)} channel(s)")
         print(f"     Total reels to produce: "
-              f"{sum(c['reels_per_day'] for c in channels)}")
+              f"{sum(c.get('reels_per_day', 1) for c in channels)}")
 
         for channel in channels:
             print(f"\n\n{'#'*55}")
             print(f"# CHANNEL: {channel['name']}")
-            print(f"# {channel['reels_per_day']} reels/day")
+            print(f"# {channel.get('reels_per_day', 1)} reels/day")
             if user_keyword:
                 print(f"# Topic: {user_keyword}")
             print(f"{'#'*55}")
 
-            Path(f"outputs/{channel['id']}").mkdir(
-                parents=True, exist_ok=True
-            )
+            Path(f"outputs/{channel['id']}").mkdir(parents=True, exist_ok=True)
 
             try:
                 topics = await self.generator.generate_topics_for_channel(
@@ -374,10 +339,10 @@ class FullPipeline:
             for topic_data in topics:
                 job = ReelJob(
                     job_id=job_counter,
-                    channel_id=channel['id'],
-                    channel_name=channel['name'],
-                    topic=topic_data['topic'],
-                    niche=channel['niche']
+                    channel_id=channel["id"],
+                    channel_name=channel["name"],
+                    topic=topic_data["topic"],
+                    niche=channel["niche"]
                 )
 
                 completed_job = await self.produce_reel(

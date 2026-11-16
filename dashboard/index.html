@@ -168,7 +168,7 @@
   .job-status { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .job-status.queued { background: var(--yellow); }
   .job-status.running { background: var(--accent); animation: pulse 1s infinite; }
-  .job-status.complete { background: var(--green); }
+  .job-status.complete, .job-status.completed { background: var(--green); }
   .job-status.failed { background: var(--red); }
   .job-info { flex: 1; }
   .job-id { font-size: 13px; font-family: monospace; color: var(--text2); }
@@ -177,7 +177,7 @@
   .job-badge { font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600; text-transform: uppercase; }
   .job-badge.queued { background: var(--yellow)20; color: var(--yellow); }
   .job-badge.running { background: var(--accent)20; color: var(--accent); }
-  .job-badge.complete { background: var(--green)20; color: var(--green); }
+  .job-badge.complete, .job-badge.completed { background: var(--green)20; color: var(--green); }
   .job-badge.failed { background: var(--red)20; color: var(--red); }
 
   .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
@@ -281,6 +281,7 @@
       <span class="status-dot" id="status-dot"></span>
       API <span id="api-status">connecting...</span>
       <div style="margin-top:6px;">Jobs: <span id="job-count">0</span></div>
+      <div style="margin-top:6px; font-size:12px;">Backend: <span id="backend-status" class="tag" style="color:var(--accent); font-weight:600;">checking...</span></div>
     </div>
   </aside>
 
@@ -524,6 +525,29 @@
             <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
           </div>
         </div>
+        <div class="card">
+          <div class="card-title">System Observability & Monitoring</div>
+          <div style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">
+            Production observability dashboards, metrics endpoints, and distributed tracing:
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="http://localhost:3001" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;">
+              📊 Grafana Dashboard (:3001)
+            </a>
+            <a href="http://localhost:9090" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;">
+              📈 Prometheus (:9090)
+            </a>
+            <a href="/metrics" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;">
+              ⚡ Metrics (/metrics)
+            </a>
+            <a href="http://localhost:16686" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;">
+              🔍 Jaeger UI (:16686)
+            </a>
+            <a href="/health/ready" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;">
+              🩺 Health Ready (/health/ready)
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -624,6 +648,23 @@
   </div>
 </div>
 
+<!-- VIDEO PREVIEW MODAL -->
+<div class="modal-overlay" id="modal-video">
+  <div class="modal" style="width: 420px; text-align: center;">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-video-title">Reel Preview</div>
+      <button class="modal-close" onclick="closeVideoModal()">✕</button>
+    </div>
+    <div style="background: #000; border-radius: 8px; overflow: hidden; margin-bottom: 16px; border: 1px solid var(--border);">
+      <video id="modal-video-player" controls playsinline style="width: 100%; max-height: 480px; display: block;"></video>
+    </div>
+    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+      <a id="modal-video-download" href="#" download class="btn btn-secondary btn-sm" target="_blank">Download MP4</a>
+      <button class="btn btn-secondary" onclick="closeVideoModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toasts"></div>
 
 <script>
@@ -685,6 +726,23 @@ async function checkApi() {
     el.style.color = 'var(--red)';
     dot.style.background = 'var(--red)';
   }
+
+  // Update backend mode from /health/ready
+  try {
+    const readyResult = await api('GET', '/health/ready');
+    const bEl = document.getElementById('backend-status');
+    if (bEl && readyResult) {
+      const mode = readyResult.video_backend_mode || 'MOCK';
+      bEl.textContent = mode;
+      if (mode === 'REAL_REMOTE') {
+        bEl.style.color = 'var(--green)';
+      } else if (mode === 'MOCK') {
+        bEl.style.color = 'var(--yellow)';
+      } else {
+        bEl.style.color = 'var(--accent)';
+      }
+    }
+  } catch (e) {}
 
   // Test n8n webhook URL with POST (n8n webhooks only respond to POST)
   if (webhookUrl) {
@@ -992,12 +1050,35 @@ async function loadStylePreset() {
 }
 
 // ── JOBS ─────────────────────────────────────────────────
+function previewReel(url, title) {
+  const modal = document.getElementById('modal-video');
+  const player = document.getElementById('modal-video-player');
+  const downloadBtn = document.getElementById('modal-video-download');
+  document.getElementById('modal-video-title').textContent = title || 'Reel Preview';
+  if (downloadBtn) downloadBtn.href = url;
+  if (player) {
+    player.src = url;
+    modal.classList.add('open');
+    player.play().catch(() => {});
+  }
+}
+
+function closeVideoModal() {
+  const modal = document.getElementById('modal-video');
+  const player = document.getElementById('modal-video-player');
+  if (player) {
+    player.pause();
+    player.src = '';
+  }
+  if (modal) modal.classList.remove('open');
+}
+
 async function loadJobs() {
   const data = await api('GET', '/jobs');
   if (!data) return;
 
   const total = data.length;
-  const complete = data.filter(j => j.status === 'complete').length;
+  const complete = data.filter(j => j.status === 'complete' || j.status === 'completed').length;
   const running = data.filter(j => j.status === 'running').length;
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-complete').textContent = complete;
@@ -1010,32 +1091,71 @@ async function loadJobs() {
     return;
   }
 
-  list.innerHTML = [...data].reverse().map(job => `
+  list.innerHTML = [...data].reverse().map(job => {
+    const statusClass = (job.status === 'complete' || job.status === 'completed') ? 'complete' : job.status;
+    let durationText = '';
+    if (job.started_at && job.completed_at) {
+      const diff = ((new Date(job.completed_at) - new Date(job.started_at)) / 1000).toFixed(1);
+      durationText = ` · ${diff}s`;
+    } else if (job.started_at && job.status === 'running') {
+      const diff = ((new Date() - new Date(job.started_at)) / 1000).toFixed(0);
+      durationText = ` · ${diff}s elapsed`;
+    }
+
+    const backendBadge = job.backend_used ? `
+      <span class="tag" style="color:${job.backend_used === 'MOCK' ? 'var(--yellow)' : 'var(--green)'}; border-color:${job.backend_used === 'MOCK' ? 'rgba(255,209,102,0.3)' : 'rgba(0,212,170,0.3)'}; margin-left:6px;">
+        ${escHtml(job.backend_used)}
+      </span>
+    ` : '';
+
+    const stageBadge = job.stage ? `
+      <span class="tag" style="margin-left:6px; color:var(--text2);">
+        stage: ${escHtml(job.stage)}${job.status === 'running' ? ` (${job.progress || 0}%)` : ''}
+      </span>
+    ` : '';
+
+    const progressBar = (job.status === 'running' || job.status === 'queued') ? `
+      <div style="margin-top:8px; background:var(--bg); border:1px solid var(--border); border-radius:4px; height:6px; overflow:hidden; width:100%; max-width:280px;">
+        <div style="background:var(--accent); height:100%; width:${Math.max(5, job.progress || 0)}%; transition:width 0.4s ease;"></div>
+      </div>
+    ` : '';
+
+    return `
     <div class="job-item">
-      <div class="job-status ${job.status}"></div>
+      <div class="job-status ${statusClass}"></div>
       <div class="job-info">
-        <div class="job-id">${job.job_id}</div>
+        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+          <span class="job-id">${escHtml(job.job_id)}</span>
+          ${backendBadge}
+          ${stageBadge}
+        </div>
         <div class="job-topic">
           ${escHtml(job.payload?.channel_id || 'unknown channel')}
           ${job.payload?.topic_override ? `→ "${escHtml(job.payload.topic_override)}"` : '→ AI topic'}
         </div>
-        <div class="job-time">${job.created_at?.substring(0,19) || ''}</div>
+        <div class="job-time">${escHtml(job.created_at?.substring(0,19) || '')}${durationText}</div>
+        ${progressBar}
         ${(job.outputs || []).length ? `
           <div style="margin-top:8px; font-size:13px; color:var(--green);">
-            ${job.outputs.length} reel(s) ready
-            ${job.outputs.map(o => `
-              <div style="color:var(--text2); margin-left:8px;">
-                • ${escHtml((o.topic||'').substring(0,50))} (${o.size_mb}MB)
-                <a href="/outputs/${escHtml(job.payload?.channel_id||'')}/${escHtml(o.file?.split('/').pop()||o.file?.split('\\\\').pop()||'')}"
-                   style="color:var(--accent); margin-left:6px;" target="_blank">view</a>
-              </div>`).join('')}
+            ${job.outputs.length} reel(s) ready:
+            ${job.outputs.map(o => {
+              const filename = escHtml(o.file?.split('/').pop()||o.file?.split('\\\\').pop()||'');
+              const url = `/outputs/${escHtml(job.payload?.channel_id||'')}/${filename}`;
+              const topicEsc = escHtml(o.topic || 'Reel Preview');
+              return `
+              <div style="color:var(--text2); margin-left:8px; margin-top:4px; display:flex; align-items:center; gap:8px;">
+                <span>• ${escHtml((o.topic||'').substring(0,45))} (${o.size_mb || 0}MB)</span>
+                <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:11px;" onclick="previewReel('${url}', '${topicEsc}')">▶ Preview</button>
+                <a href="${url}" style="color:var(--accent); font-size:12px;" target="_blank">open</a>
+              </div>`;
+            }).join('')}
           </div>
         ` : ''}
         ${job.error ? `<div style="color:var(--red); font-size:13px; margin-top:4px;">${escHtml(job.error)}</div>` : ''}
       </div>
-      <span class="job-badge ${job.status}">${job.status}</span>
+      <span class="job-badge ${statusClass}">${escHtml(job.status)}</span>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 // ── STYLES PAGE ──────────────────────────────────────────
@@ -1521,7 +1641,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTypingAnimation();
 
   setInterval(() => {
-    // Only ping Flask health silently — not the n8n webhook
+    // Ping Flask health silently
     api('GET', '/health').then(result => {
       const el = document.getElementById('api-status');
       const dot = document.getElementById('status-dot');
@@ -1536,6 +1656,21 @@ document.addEventListener('DOMContentLoaded', () => {
         dot.style.background = 'var(--red)';
       }
     });
+    // Silently check backend mode
+    api('GET', '/health/ready').then(readyResult => {
+      const bEl = document.getElementById('backend-status');
+      if (bEl && readyResult) {
+        const mode = readyResult.video_backend_mode || 'MOCK';
+        bEl.textContent = mode;
+        if (mode === 'REAL_REMOTE') {
+          bEl.style.color = 'var(--green)';
+        } else if (mode === 'MOCK') {
+          bEl.style.color = 'var(--yellow)';
+        } else {
+          bEl.style.color = 'var(--accent)';
+        }
+      }
+    }).catch(() => {});
     if (document.getElementById('page-jobs').classList.contains('active')) loadJobs();
   }, 5000);
 });

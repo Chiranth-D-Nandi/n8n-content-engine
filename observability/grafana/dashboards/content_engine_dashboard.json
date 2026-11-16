@@ -1,0 +1,168 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "API Gateway & Traffic Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 },
+      "id": 2,
+      "title": "API Request Throughput",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[1m])) by (method, status)",
+          "legendFormat": "{{method}} - {{status}}"
+        }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 1 },
+      "id": 3,
+      "title": "API Request Latency (p95 & p50)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p95 Latency"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p50 Latency"
+        }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 1 },
+      "id": 4,
+      "title": "In-Flight HTTP Requests",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "http_requests_in_flight",
+          "legendFormat": "Active Requests"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "id": 5,
+      "title": "Asynchronous Job Queue & Celery Performance",
+      "type": "row"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 9 },
+      "id": 6,
+      "title": "Jobs Queued vs Running",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "jobs_queued", "legendFormat": "Queued" },
+        { "expr": "jobs_running", "legendFormat": "Running" }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 9 },
+      "id": 7,
+      "title": "Completed vs Failed Jobs Rate",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(jobs_completed_total[5m]))", "legendFormat": "Completed / sec" },
+        { "expr": "sum(rate(jobs_failed_total[5m]))", "legendFormat": "Failed / sec" }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 9 },
+      "id": 8,
+      "title": "Pipeline Stage Latencies (Average Seconds)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(stage_duration_seconds_sum[5m])) by (stage) / sum(rate(stage_duration_seconds_count[5m])) by (stage)",
+          "legendFormat": "{{stage}}"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 9,
+      "title": "ML Serving: BentoML Whisper & CogVideoX Gateway",
+      "type": "row"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 17 },
+      "id": 10,
+      "title": "ML Inference Latency by Model",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(ml_inference_latency_seconds_bucket[5m])) by (le, model, backend))",
+          "legendFormat": "{{model}} ({{backend}}) p95"
+        }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 17 },
+      "id": 11,
+      "title": "Backend Availability (1 = Available, 0 = Down)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "ml_backend_availability",
+          "legendFormat": "{{backend}}"
+        }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 17 },
+      "id": 12,
+      "title": "ML Backend Errors by Type",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(ml_backend_errors_total[5m])) by (model, error_type)",
+          "legendFormat": "{{model}}: {{error_type}}"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["content-engine", "mlops", "observability"],
+  "time": { "from": "now-30m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Matiks Content Engine - MLOps Dashboard",
+  "uid": "matiks-content-engine-mlops",
+  "version": 1
+}

@@ -1,0 +1,57 @@
+# ── Stage 1: Build & Dependencies ──
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+# Install dependencies into virtualenv
+RUN python -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir \
+        flask>=3.0.0 \
+        flask-cors>=4.0.0 \
+        pydantic>=2.0.0 \
+        redis>=5.0.0 \
+        celery>=5.3.0 \
+        prometheus-client>=0.19.0 \
+        opentelemetry-api>=1.20.0 \
+        opentelemetry-sdk>=1.20.0 \
+        opentelemetry-instrumentation-flask>=0.45b0 \
+        requests>=2.31.0 \
+        python-dotenv>=1.0.0 \
+        gunicorn>=21.2.0
+
+# ── Stage 2: Final Runtime ──
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtualenv from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create unprivileged user
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/outputs /app/temp && \
+    chown -R appuser:appuser /app
+
+COPY --chown=appuser:appuser . /app
+
+USER appuser
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "api:app"]

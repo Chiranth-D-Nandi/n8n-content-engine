@@ -1,0 +1,40 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+        flask>=3.0.0 \
+        pydantic>=2.0.0 \
+        redis>=5.0.0 \
+        celery>=5.3.0 \
+        prometheus-client>=0.19.0 \
+        opentelemetry-api>=1.20.0 \
+        opentelemetry-sdk>=1.20.0 \
+        opentelemetry-instrumentation-celery>=0.45b0 \
+        edge-tts>=6.1.16 \
+        google-genai>=1.0.0 \
+        google-api-python-client>=2.0.0 \
+        pytrends>=4.9.2 \
+        feedparser>=6.0.10 \
+        isodate>=0.6.1 \
+        requests>=2.31.0 \
+        python-dotenv>=1.0.0
+
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/outputs /app/temp && \
+    chown -R appuser:appuser /app
+
+COPY --chown=appuser:appuser . /app
+
+USER appuser
+
+CMD ["celery", "-A", "app.core.celery_app.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
