@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matiks Content Engine</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: rgba(18, 18, 26, 0.45);
+    --surface2: rgba(26, 26, 38, 0.45);
+    --border: rgba(42, 42, 61, 0.45);
+    --accent: #EAB308;
+    --accent2: #ff6584;
+    --green: #00d4aa;
+    --yellow: #ffd166;
+    --red: #8b0000;
+    --text: #9090b0;
+    --text2: #e8e8f0;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+  }
+  .app { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar {
+    width: 240px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .main { flex: 1; overflow-y: auto; }
+
+  .logo { padding: 24px 20px; border-bottom: 1px solid var(--border); }
+  .logo h1 {
+    font-size: 22px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .logo p { font-size: 12px; color: var(--text2); margin-top: 3px; }
+  .nav { padding: 16px 12px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    color: var(--text2); font-size: 15px; transition: all 0.15s;
+    margin-bottom: 2px; border: none; background: none;
+    width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent)20; color: var(--accent); }
+  .nav-item .icon { font-size: 18px; width: 20px; text-align: center; }
+  .status-bar {
+    padding: 16px; border-top: 1px solid var(--border);
+    font-size: 13px; color: var(--text2);
+  }
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--green);
+    margin-right: 6px; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .page-header { padding: 28px 32px 0; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 12px 4px; font-size: 15px; color: var(--text2);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.15s; border: none; background: none; white-space: nowrap;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .page { padding: 28px 32px; display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { font-size: 15px; color: var(--text2); margin-bottom: 28px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 15px; font-weight: 600; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px;
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  label {
+    display: block; font-size: 13px; font-weight: 500; color: var(--text2);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  input, select, textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; color: var(--text);
+    font-size: 15px; font-family: var(--font); transition: border-color 0.15s; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+  textarea { resize: vertical; min-height: 80px; }
+  .form-group { margin-bottom: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .hint { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+  .btn {
+    padding: 10px 20px; border-radius: 8px; font-size: 15px;
+    font-weight: 500; cursor: pointer; border: none;
+    transition: all 0.15s; font-family: var(--font);
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #5a52e0; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); }
+  .btn-danger { background: var(--red)20; color: var(--red); border: 1px solid var(--red)40; }
+  .btn-danger:hover { background: var(--red)30; }
+  .btn-success { background: var(--green)20; color: var(--green); border: 1px solid var(--green)40; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+  
+  #launch-btn { background: var(--accent); color: var(--red); }
+  #launch-btn:hover { background: transparent; color: white; border: 1px solid white; }
+  
+  #reset-btn { border: 1px solid white !important; }
+  #reset-btn:hover { background: var(--accent); color: var(--red); border-color: var(--accent) !important; }
+
+  #typing-text { color: #e8e8f0; }
+  #typing-cursor { color: #e8e8f0; }
+
+  .channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .channel-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px; transition: border-color 0.15s;
+  }
+  .channel-card:hover { border-color: var(--accent)60; }
+  .channel-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .channel-name { font-weight: 600; font-size: 17px; }
+  .channel-id { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .channel-badge { font-size: 11px; padding: 3px 8px; border-radius: 20px; background: var(--accent)20; color: var(--accent); font-weight: 500; }
+  .channel-meta { font-size: 13px; color: var(--text2); line-height: 1.8; }
+  .channel-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+  .color-row { display: flex; align-items: center; gap: 10px; }
+  .color-row input[type="color"] { width: 40px; height: 36px; padding: 2px; cursor: pointer; flex-shrink: 0; }
+  .color-row input[type="text"] { flex: 1; }
+
+  .subtitle-preview {
+    background: #000; border-radius: 8px; aspect-ratio: 9/16; max-height: 300px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; border: 2px solid white;
+  }
+  .subtitle-preview-text {
+    position: absolute; text-align: center; padding: 0 20px; width: 100%; transition: all 0.2s;
+  }
+
+  .job-list { display: flex; flex-direction: column; gap: 12px; }
+  .job-item {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; gap: 16px;
+  }
+  .job-status { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .job-status.queued { background: var(--yellow); }
+  .job-status.running { background: var(--accent); animation: pulse 1s infinite; }
+  .job-status.complete { background: var(--green); }
+  .job-status.failed { background: var(--red); }
+  .job-info { flex: 1; }
+  .job-id { font-size: 13px; font-family: monospace; color: var(--text2); }
+  .job-topic { font-size: 15px; font-weight: 500; margin-top: 2px; }
+  .job-time { font-size: 13px; color: var(--text2); }
+  .job-badge { font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600; text-transform: uppercase; }
+  .job-badge.queued { background: var(--yellow)20; color: var(--yellow); }
+  .job-badge.running { background: var(--accent)20; color: var(--accent); }
+  .job-badge.complete { background: var(--green)20; color: var(--green); }
+  .job-badge.failed { background: var(--red)20; color: var(--red); }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .stat-value {
+    font-size: 31px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .stat-label { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  input[type="range"] { padding: 0; height: 4px; accent-color: var(--accent); cursor: pointer; }
+  .range-row { display: flex; align-items: center; gap: 12px; }
+  .range-row input[type="range"] { flex: 1; }
+  .range-value { font-size: 15px; font-weight: 600; color: var(--accent); min-width: 40px; text-align: right; }
+
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 15px; }
+  .toggle-sub { font-size: 13px; color: var(--text2); }
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: 0.2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 560px; max-height: 80vh; overflow-y: auto; max-width: 95vw; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .modal-title { font-size: 20px; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--text2); font-size: 22px; cursor: pointer; padding: 4px; }
+  .modal-close:hover { color: var(--text); }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  .toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 200; }
+  .toast { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 15px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.2s ease; min-width: 280px; }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+  .toast.info { border-left: 3px solid var(--accent); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+  .empty-state { text-align: center; padding: 48px; color: var(--text2); }
+  .empty-state .icon { font-size: 44px; margin-bottom: 12px; }
+  .empty-state p { font-size: 15px; }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--border); margin: 2px; }
+  code { font-family: monospace; font-size: 13px; background: var(--bg); padding: 2px 6px; border-radius: 4px; color: var(--accent); }
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+
+  /* ── GridScan Background ── */
+  #grid-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+  }
+  #grid-background canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/postprocessing@6/build/postprocessing.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+<div id="grid-background"></div>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <h1>Chiranth D Nandi</h1>
+      <p>Content Engine v1.0</p>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="showPage('generate', this)">
+        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M0 1a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm4 0v6h8V1zm8 8H4v6h8zM1 1v2h2V1zm2 3H1v2h2zM1 7v2h2V7zm2 3H1v2h2zm-2 3v2h2v-2zM15 1h-2v2h2zm-2 3v2h2V4zm2 3h-2v2h2zm-2 3v2h2v-2zm2 3h-2v2h2z"/></svg></span> Generate Reel
+      </button>
+      <button class="nav-item" onclick="showPage('channels', this)">
+        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 3.5a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1zm2-2a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1zM0 13a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 13V6a1.5 1.5 0 0 0-1.5-1.5h-13A1.5 1.5 0 0 0 0 6zm6.258-6.437a.5.5 0 0 1 .507.013l4 2.5a.5.5 0 0 1 0 .848l-4 2.5A.5.5 0 0 1 6 12V7a.5.5 0 0 1 .258-.437"/></svg></span> Channels
+      </button>
+      <button class="nav-item" onclick="showPage('jobs', this)">
+        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg></span> Job Monitor
+      </button>
+      <button class="nav-item" onclick="showPage('settings', this)">
+        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-router-fill" viewBox="0 0 16 16">
+  <path d="M5.525 3.025a3.5 3.5 0 0 1 4.95 0 .5.5 0 1 0 .707-.707 4.5 4.5 0 0 0-6.364 0 .5.5 0 0 0 .707.707"/>
+  <path d="M6.94 4.44a1.5 1.5 0 0 1 2.12 0 .5.5 0 0 0 .708-.708 2.5 2.5 0 0 0-3.536 0 .5.5 0 0 0 .707.707Z"/>
+  <path d="M2.974 2.342a.5.5 0 1 0-.948.316L3.806 8H1.5A1.5 1.5 0 0 0 0 9.5v2A1.5 1.5 0 0 0 1.5 13H2a.5.5 0 0 0 .5.5h2A.5.5 0 0 0 5 13h6a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5h.5a1.5 1.5 0 0 0 1.5-1.5v-2A1.5 1.5 0 0 0 14.5 8h-2.306l1.78-5.342a.5.5 0 1 0-.948-.316L11.14 8H4.86zM2.5 11a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m4.5-.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0m2.5.5a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m1.5-.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0m2 0a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0"/>
+  <path d="M8.5 5.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0"/>
+</svg></span> Settings
+      </button>
+    </nav>
+    <div class="status-bar">
+      <span class="status-dot" id="status-dot"></span>
+      API <span id="api-status">connecting...</span>
+      <div style="margin-top:6px;">Jobs: <span id="job-count">0</span></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- GENERATE PAGE -->
+    <div id="page-generate" class="page active">
+      <div class="page-header">
+        <div style="padding-bottom:16px; flex:1">
+          <div class="page-title" id="typing-title"><span id="typing-text"></span><span id="typing-cursor" style="display: none;">|</span></div>
+          <div class="page-sub">Configure selections and launch the content creation pipeline!</div>
+        </div>
+      </div>
+      <div style="padding:28px 32px;">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Jobs</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-complete">0</div><div class="stat-label">Completed</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-running">0</div><div class="stat-label">Running</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-channels">0</div><div class="stat-label">Channels</div></div>
+        </div>
+        <div class="grid-2">
+          <!-- LEFT -->
+          <div>
+            <div class="card">
+              <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:8px;vertical-align:middle;"><path d="M2.5 3.5a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1zm2-2a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1zM0 13a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 13V6a1.5 1.5 0 0 0-1.5-1.5h-13A1.5 1.5 0 0 0 0 6zm6.258-6.437a.5.5 0 0 1 .507.013l4 2.5a.5.5 0 0 1 0 .848l-4 2.5A.5.5 0 0 1 6 12V7a.5.5 0 0 1 .258-.437"/></svg>Channel Selection</div>
+              <div class="form-group">
+                <label>Channel / Genre</label>
+                <select id="channel-select" onchange="onChannelChange()">
+                  <option value="">Loading channels...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Topic Override <span style="color:var(--text2);font-weight:400;">(optional)</span></label>
+                <input type="text" id="topic-override" placeholder="Leave blank → AI picks trending topic"/>
+                <div class="hint">Example: "GPT-5 release" or "cold showers science"</div>
+              </div>
+              <div class="form-group">
+                <label>Number of Reels</label>
+                <div class="range-row">
+                  <input type="range" id="reel-count" min="1" max="5" value="1"
+                    oninput="document.getElementById('reel-count-val').textContent=this.value">
+                  <div class="range-value" id="reel-count-val">1</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Reel Style</label>
+                <select id="reel-style">
+                  <option value="auto">Auto (from channel config)</option>
+                  <option value="rapid_fire">Rapid Fire Facts</option>
+                  <option value="pov">POV Format</option>
+                  <option value="news_style">Breaking News</option>
+                  <option value="storytime">Storytime</option>
+                  <option value="documentary">Documentary</option>
+                  <option value="reaction">Reaction</option>
+                </select>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-play-fill" viewBox="0 0 16 16" style="margin-right:8px;vertical-align:middle;"><path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1M6 6.883a.5.5 0 0 1 .757-.429l3.528 2.117a.5.5 0 0 1 0 .858l-3.528 2.117a.5.5 0 0 1-.757-.43V6.884z"/></svg>Channel Info</div>
+              <div id="channel-info" class="channel-meta">Select a channel to see details</div>
+            </div>
+          </div>
+          <!-- RIGHT -->
+          <div>
+            <div class="card">
+              <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-alphabet" viewBox="0 0 16 16" style="margin-right:8px;vertical-align:middle;"><path d="M2.204 11.078c.767 0 1.201-.356 1.406-.737h.059V11h1.216V7.519c0-1.314-.947-1.783-2.11-1.783C1.355 5.736.75 6.42.69 7.27h1.216c.064-.323.313-.552.84-.552s.864.249.864.771v.464H2.346C1.145 7.953.5 8.568.5 9.496c0 .977.693 1.582 1.704 1.582m.42-.947c-.44 0-.845-.235-.845-.718 0-.395.269-.684.84-.684h.991v.538c0 .503-.444.864-.986.864m5.593.937c1.216 0 1.948-.869 1.948-2.31v-.702c0-1.44-.727-2.305-1.929-2.305-.742 0-1.328.347-1.499.889h-.063V3.983h-1.29V11h1.27v-.791h.064c.21.532.776.86 1.499.86Zm-.43-1.025c-.66 0-1.113-.518-1.113-1.28V8.12c0-.825.42-1.343 1.098-1.343.684 0 1.075.518 1.075 1.416v.45c0 .888-.386 1.401-1.06 1.401Zm2.834-1.328c0 1.47.87 2.378 2.305 2.378 1.416 0 2.139-.777 2.158-1.763h-1.186c-.06.425-.313.732-.933.732-.66 0-1.05-.512-1.05-1.352v-.625c0-.81.371-1.328 1.045-1.328.635 0 .879.425.918.776h1.187c-.02-.986-.787-1.806-2.14-1.806-1.41 0-2.304.918-2.304 2.338z"/></svg>Subtitle Style</div>
+              <div class="form-group">
+                <label>Preset</label>
+                <select id="style-preset" onchange="loadStylePreset()">
+                  <option value="custom">Custom</option>
+                  <option value="bold_white">Bold White</option>
+                  <option value="bold_yellow">Bold Yellow</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Font</label>
+                  <select id="sub-font" onchange="updatePreview()">
+                    <option>Arial</option><option>Arial Black</option><option>Impact</option>
+                    <option>Times New Roman</option><option>Courier New</option><option>Verdana</option>
+                    <option>Georgia</option><option>Comic Sans MS</option><option>Trebuchet MS</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Font Size</label>
+                  <div class="range-row">
+                    <input type="range" id="sub-size" min="44" max="132" value="88"
+                      oninput="updatePreview(); document.getElementById('sub-size-val').textContent=this.value">
+                    <div class="range-value" id="sub-size-val">88</div>
+                  </div>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label style="margin-bottom:12px;">Bold</label>
+                  <label class="toggle">
+                    <input type="checkbox" id="sub-bold" onchange="updatePreview()">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label style="margin-bottom:12px;">Italic</label>
+                  <label class="toggle">
+                    <input type="checkbox" id="sub-italic" onchange="updatePreview()">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Text Color</label>
+                  <div class="color-row">
+                    <input type="color" id="sub-color" value="#FFFFFF" oninput="syncColor('sub-color','sub-color-hex'); updatePreview()">
+                    <input type="text" id="sub-color-hex" value="#FFFFFF" oninput="syncHex('sub-color-hex','sub-color'); updatePreview()" maxlength="7">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Position</label>
+                  <select id="sub-position" onchange="updatePreview()">
+                    <option value="top">Top</option>
+                    <option value="center" selected>Center</option>
+                    <option value="bottom">Bottom</option>
+                  </select>
+                </div>
+              </div>
+              <label>Preview</label>
+              <div class="subtitle-preview">
+                <div class="subtitle-preview-text" id="preview-text">SAMPLE CAPTION TEXT</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:8px;">
+          <button class="btn btn-secondary" id="reset-btn" onclick="resetForm()">Reset</button>
+          <button class="btn btn-primary" id="launch-btn" onclick="launchPipeline()">Launch Pipeline</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHANNELS PAGE -->
+    <div id="page-channels" class="page">
+      <div class="page-header">
+        <div style="padding-bottom:16px; flex:1">
+          <div class="page-title">Channel Manager</div>
+          <div class="page-sub">Add, edit, and manage your content channels</div>
+        </div>
+      </div>
+      <div style="padding:28px 32px;">
+        <div class="section-header">
+          <div style="font-size:15px; color:var(--text2);"><span id="channel-count">0</span> channels configured</div>
+          <button class="btn btn-primary" onclick="openAddChannel()">+ Add Channel</button>
+        </div>
+        <div class="channel-grid" id="channel-grid">
+          <div class="empty-state"><div class="icon"></div><p>Loading channels...</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOBS PAGE -->
+    <div id="page-jobs" class="page">
+      <div class="page-header">
+        <div style="padding-bottom:16px; flex:1">
+          <div class="page-title">Job Monitor</div>
+          <div class="page-sub">Real-time pipeline status and outputs</div>
+        </div>
+      </div>
+      <div style="padding:28px 32px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+          <div style="font-size:15px; color:var(--text2);">Auto-refreshes every 5 seconds</div>
+          <button class="btn btn-secondary btn-sm" onclick="loadJobs()">↻ Refresh</button>
+        </div>
+        <div class="job-list" id="job-list">
+          <div class="empty-state"><div class="icon"></div><p>No jobs yet. Launch a pipeline to get started.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STYLES PAGE -->
+    <!-- SETTINGS PAGE -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <div style="padding-bottom:16px; flex:1">
+          <div class="page-title">Settings</div>
+          <div class="page-sub">API keys, webhook, and pipeline configuration</div>
+        </div>
+      </div>
+      <div style="padding:28px 32px;">
+        <div class="card">
+          <div class="card-title">n8n Webhook</div>
+          <div class="form-group">
+            <label>Webhook URL</label>
+            <input type="text" id="webhook-url" value="http://localhost:5678/webhook/matiks-reel">
+            <div class="hint">Your n8n webhook endpoint (typically port 5678) or direct API endpoint</div>
+          </div>
+          <div class="form-group">
+            <label>API Base URL</label>
+            <input type="text" id="api-url" value="http://localhost:5000"
+              onchange="API_BASE=this.value; checkApi()">
+          </div>
+          <button class="btn btn-secondary" onclick="checkApi()">Test Connection</button>
+        </div>
+        <div class="card" style="background: rgba(0, 212, 170, 0.05); border-color: rgba(0, 212, 170, 0.2);">
+          <div class="card-title">Connection Debugging</div>
+          <div style="font-size: 13px; line-height: 1.8; color: var(--text2);">
+            <strong style="color: var(--green);">What gets tested:</strong>
+            <ul style="margin-left: 16px; margin-top: 8px;">
+              <li>✓ Flask API health check (port 5000) — keeps the job queue running</li>
+              <li>✓ n8n webhook URL — where pipeline requests are sent</li>
+            </ul>
+            <br>
+            <strong style="color: var(--green);">If Flask is offline:</strong>
+            <ul style="margin-left: 16px; margin-top: 8px;">
+              <li>Run: <code>python api.py</code> in your matiks folder</li>
+              <li>Check: <code>curl http://localhost:5000/health</code></li>
+            </ul>
+            <br>
+            <strong style="color: var(--green);">If n8n webhook fails:</strong>
+            <ul style="margin-left: 16px; margin-top: 8px;">
+              <li>Is n8n running? Run: <code>n8n start</code></li>
+              <li>Does your webhook exist? Check n8n → Workflows → [Your workflow]</li>
+              <li>Did you set method=POST on your Webhook node?</li>
+              <li>CORS issue? Add to Webhook response headers: <code>Access-Control-Allow-Origin: *</code></li>
+              <li>Test directly: <code>curl -X POST http://localhost:5678/webhook/matiks-reel -H "Content-Type: application/json" -d "{\"test\":true}"</code></li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Pipeline Defaults</div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Auto-subtitle generation</div>
+              <div class="toggle-sub">Generate Whisper subtitles for every reel</div>
+            </div>
+            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Save to database</div>
+              <div class="toggle-sub">Store scripts and topics in matiks.db</div>
+            </div>
+            <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD CHANNEL MODAL -->
+<div class="modal-overlay" id="modal-channel">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-channel-title">Add Channel</div>
+      <button class="modal-close" onclick="closeModal('modal-channel')">✕</button>
+    </div>
+    <input type="hidden" id="edit-channel-id-original">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Channel ID *</label>
+        <input type="text" id="ch-id" placeholder="my_channel_01">
+        <div class="hint">Unique identifier, no spaces</div>
+      </div>
+      <div class="form-group">
+        <label>Display Name *</label>
+        <input type="text" id="ch-name" placeholder="My Channel">
+      </div>
+    </div>
+    <div class="form-group"><label>Niche *</label><input type="text" id="ch-niche" placeholder="artificial intelligence and technology"></div>
+    <div class="form-group"><label>Target Audience</label><input type="text" id="ch-audience" placeholder="tech-curious people 18-35"></div>
+    <div class="form-group"><label>Tone</label><input type="text" id="ch-tone" placeholder="mind-blowing, accessible, fast"></div>
+    <div class="form-group"><label>Search Keywords (comma separated)</label><input type="text" id="ch-keywords" placeholder="ChatGPT, AI tools, machine learning"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Duration (seconds)</label>
+        <select id="ch-duration">
+          <option value="30">30s</option><option value="45">45s</option>
+          <option value="60" selected>60s</option><option value="90">90s</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Reels per Day</label>
+        <select id="ch-reels"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Voice Preset</label>
+        <select id="ch-voice">
+          <option value="en-US-ChristopherNeural">Christopher (Male)</option>
+          <option value="en-US-GuyNeural">Guy (Male)</option>
+          <option value="en-US-AriaNeural">Aria (Female)</option>
+          <option value="en-US-JennyNeural">Jenny (Female)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Caption Style</label>
+        <select id="ch-caption"><option value="bold_white">Bold White</option><option value="bold_yellow">Bold Yellow</option></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Content Rules (one per line)</label>
+      <textarea id="ch-rules" placeholder="Lead with the most surprising fact&#10;Explain like talking to a smart friend"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-channel')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveChannel()">Save Channel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD STYLE MODAL -->
+<div class="modal-overlay" id="modal-style">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">New Caption Style</div>
+      <button class="modal-close" onclick="closeModal('modal-style')">✕</button>
+    </div>
+    <div class="form-group"><label>Style Name</label><input type="text" id="style-name" placeholder="my_style"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Font</label>
+        <select id="new-style-font"><option>Arial Black</option><option>Impact</option><option>Montserrat</option></select>
+      </div>
+      <div class="form-group"><label>Font Size</label><input type="number" id="new-style-size" value="80" min="30" max="150"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Text Color</label><input type="color" id="new-style-color" value="#FFFFFF"></div>
+      <div class="form-group"><label>Stroke Color</label><input type="color" id="new-style-stroke" value="#000000"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Stroke Width</label><input type="number" id="new-style-sw" value="4" min="0" max="10"></div>
+      <div class="form-group">
+        <label>Position</label>
+        <select id="new-style-pos"><option value="center">Center</option><option value="bottom">Bottom</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-style')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveStyle()">Save Style</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+let API_BASE = 'http://localhost:5000';
+let channels = [];
+let currentEditChannelId = null;
+
+// ── NAVIGATION ──────────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'channels') loadChannels();
+  if (name === 'jobs') loadJobs();
+  if (name === 'styles') loadStyles();
+}
+
+// ── API ──────────────────────────────────────────────────
+async function api(method, path, body) {
+  try {
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      console.error('API error:', err);
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    console.error('API fetch error:', e);
+    return null;
+  }
+}
+
+//n8n wehbook testing
+async function checkApi() {
+  const el = document.getElementById('api-status');
+  const dot = document.getElementById('status-dot');
+  const webhookUrl = document.getElementById('webhook-url')?.value;
+
+  // Test Flask API health
+  try {
+    const result = await api('GET', '/health');
+    if (result && result.status === 'ok') {
+      el.textContent = 'connected';
+      el.style.color = 'var(--green)';
+      dot.style.background = 'var(--green)';
+      document.getElementById('job-count').textContent = result.jobs || 0;
+    } else {
+      throw new Error('bad response');
+    }
+  } catch (e) {
+    el.textContent = 'offline';
+    el.style.color = 'var(--red)';
+    dot.style.background = 'var(--red)';
+  }
+
+  // Test n8n webhook URL with POST (n8n webhooks only respond to POST)
+  if (webhookUrl) {
+    try {
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true })
+      });
+      // n8n returns 200 even in test mode - any response means it's reachable
+      toast('n8n webhook reachable ✓', 'success');
+    } catch (e) {
+      toast('n8n webhook unreachable — Is n8n running on port 5678?', 'error');
+    }
+  } else if (!webhookUrl) {
+    toast('Webhook URL not configured', 'info');
+  }
+}
+
+// ── CHANNELS ─────────────────────────────────────────────
+async function loadChannels() {
+  // FIX: /genres now returns full data, so all channel fields are present
+  const data = await api('GET', '/channels');
+  const genres = await api('GET', '/genres');
+  channels = [];
+
+  if (data) channels.push(...data.map(c => ({ ...c, source: 'config' })));
+  if (genres) channels.push(...genres.map(g => ({ ...g, source: 'genre' })));
+
+  document.getElementById('channel-count').textContent = channels.length;
+  document.getElementById('stat-channels').textContent = channels.length;
+
+  const sel = document.getElementById('channel-select');
+  sel.innerHTML = '<option value="">Select channel...</option>';
+  channels.forEach(ch => {
+    const opt = document.createElement('option');
+    opt.value = ch.id;
+    opt.textContent = `${ch.name} (${ch.id})`;
+    sel.appendChild(opt);
+  });
+
+  const grid = document.getElementById('channel-grid');
+  if (!channels.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="icon"></div><p>No channels yet</p></div>';
+    return;
+  }
+
+  grid.innerHTML = channels.map(ch => `
+    <div class="channel-card">
+      <div class="channel-card-header">
+        <div>
+          <div class="channel-name">${escHtml(ch.name)}</div>
+          <div class="channel-id">${escHtml(ch.id)}</div>
+        </div>
+        <span class="channel-badge">${ch.source === 'genre' ? 'Genre' : 'Custom'}</span>
+      </div>
+      <div class="channel-meta">
+        <div>${escHtml(ch.niche || '-')}</div>
+        <div>${escHtml(ch.target_audience || '-')}</div>
+        <div>${ch.duration_seconds || 60}s · ${ch.reels_per_day || 1} reels/day</div>
+        <div>${escHtml(ch.voice_preset || '-')}</div>
+      </div>
+      <div class="channel-actions">
+        <button class="btn btn-secondary btn-sm" onclick="quickGenerate('${ch.id}')">Quick Generate</button>
+        ${ch.source !== 'genre' ? `
+          <button class="btn btn-secondary btn-sm" onclick="editChannel('${ch.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}')">Delete</button>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function onChannelChange() {
+  const id = document.getElementById('channel-select').value;
+  const ch = channels.find(c => c.id === id);
+  const info = document.getElementById('channel-info');
+  if (!ch) { info.innerHTML = 'Select a channel to see details'; return; }
+
+  // FIX: safely access all fields (genres now return full data)
+  const keywords = Array.isArray(ch.search_keywords) ? ch.search_keywords : (ch.keywords || []);
+  const rules = Array.isArray(ch.content_rules) ? ch.content_rules : [];
+
+  info.innerHTML = `
+    <div style="margin-bottom:8px;">
+      <strong style="color:var(--text)">${escHtml(ch.name)}</strong>
+      <span class="tag">${escHtml(ch.id)}</span>
+    </div>
+    <div>${escHtml(ch.niche || '-')}</div>
+    <div>${escHtml(ch.target_audience || '-')}</div>
+    <div>${escHtml(ch.tone || '-')}</div>
+    <div>${ch.duration_seconds || 60}s duration</div>
+    <div>${escHtml(ch.voice_preset || '-')}</div>
+    ${rules.length ? `
+      <div style="margin-top:10px; color:var(--text); font-weight:500; font-size:13px;">RULES:</div>
+      ${rules.map(r => `<div>• ${escHtml(r)}</div>`).join('')}
+    ` : ''}
+  `;
+}
+
+function openAddChannel() {
+  currentEditChannelId = null;
+  document.getElementById('modal-channel-title').textContent = 'Add Channel';
+  document.getElementById('ch-id').disabled = false;
+  ['ch-id','ch-name','ch-niche','ch-audience','ch-tone','ch-keywords','ch-rules'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('modal-channel').classList.add('open');
+}
+
+function editChannel(id) {
+  const ch = channels.find(c => c.id === id);
+  if (!ch) return;
+  currentEditChannelId = id;
+  document.getElementById('modal-channel-title').textContent = 'Edit Channel';
+  document.getElementById('ch-id').value = ch.id;
+  document.getElementById('ch-id').disabled = true;
+  document.getElementById('ch-name').value = ch.name || '';
+  document.getElementById('ch-niche').value = ch.niche || '';
+  document.getElementById('ch-audience').value = ch.target_audience || '';
+  document.getElementById('ch-tone').value = ch.tone || '';
+  const kw = ch.search_keywords || ch.keywords || [];
+  document.getElementById('ch-keywords').value = kw.join(', ');
+  document.getElementById('ch-duration').value = ch.duration_seconds || 60;
+  document.getElementById('ch-reels').value = ch.reels_per_day || 2;
+  document.getElementById('ch-voice').value = ch.voice_preset || 'en-US-ChristopherNeural';
+  document.getElementById('ch-caption').value = ch.caption_style || 'bold_white';
+  document.getElementById('ch-rules').value = (ch.content_rules || []).join('\n');
+  document.getElementById('modal-channel').classList.add('open');
+}
+
+async function saveChannel() {
+  const isEdit = currentEditChannelId !== null;
+  const payload = {
+    id: document.getElementById('ch-id').value.trim(),
+    name: document.getElementById('ch-name').value.trim(),
+    niche: document.getElementById('ch-niche').value.trim(),
+    target_audience: document.getElementById('ch-audience').value.trim(),
+    tone: document.getElementById('ch-tone').value.trim(),
+    search_keywords: document.getElementById('ch-keywords').value.split(',').map(k => k.trim()).filter(Boolean),
+    duration_seconds: parseInt(document.getElementById('ch-duration').value),
+    reels_per_day: parseInt(document.getElementById('ch-reels').value),
+    voice_preset: document.getElementById('ch-voice').value,
+    caption_style: document.getElementById('ch-caption').value,
+    content_rules: document.getElementById('ch-rules').value.split('\n').map(r => r.trim()).filter(Boolean)
+  };
+  if (!payload.id || !payload.name || !payload.niche) {
+    toast('Fill in required fields (ID, Name, Niche)', 'error'); return;
+  }
+  const result = isEdit
+    ? await api('PUT', `/channels/${currentEditChannelId}`, payload)
+    : await api('POST', '/channels', payload);
+  if (result && result.success) {
+    toast(`Channel ${isEdit ? 'updated' : 'added'} successfully`, 'success');
+    closeModal('modal-channel');
+    loadChannels();
+  } else {
+    toast(result?.error || 'Failed to save channel', 'error');
+  }
+}
+
+async function deleteChannel(id) {
+  if (!confirm(`Delete channel "${id}"? This cannot be undone.`)) return;
+  const result = await api('DELETE', `/channels/${id}`);
+  if (result && result.success) {
+    toast('Channel deleted', 'success');
+    loadChannels();
+  } else {
+    toast('Failed to delete channel', 'error');
+  }
+}
+
+function quickGenerate(channelId) {
+  document.querySelectorAll('.nav-item').forEach((n,i) => n.classList.toggle('active', i === 0));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-generate').classList.add('active');
+  document.getElementById('channel-select').value = channelId;
+  onChannelChange();
+  toast(`Ready to generate for ${channelId}`, 'info');
+}
+
+// ── PIPELINE LAUNCH ───────────────────────────────────────
+async function launchPipeline() {
+  const channelId = document.getElementById('channel-select').value;
+  if (!channelId) { toast('Select a channel first', 'error'); return; }
+
+  const btn = document.getElementById('launch-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Launching...';
+
+  const style = getSubtitleStyle();
+  const webhookUrl = document.getElementById('webhook-url')?.value || `${API_BASE}/webhook/matiks-reel`;
+
+  const payload = {
+    channel_id: channelId,
+    topic_override: document.getElementById('topic-override').value.trim(),
+    reel_count: parseInt(document.getElementById('reel-count').value),
+    subtitle_style: style
+  };
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.job_id) {
+      toast(`Pipeline launched! Job: ${result.job_id}`, 'success');
+      // Switch to jobs page
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('page-jobs').classList.add('active');
+      document.querySelectorAll('.nav-item')[2].classList.add('active');
+      loadJobs();
+    } else {
+      toast('Launch failed: ' + (result.error || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    let errorMsg = 'Cannot reach webhook. ';
+    if (e.message.includes('Failed to fetch') || e.message.includes('CORS')) {
+      errorMsg += 'CORS blocked or n8n not responding. ';
+      if (webhookUrl.includes('5678')) {
+        errorMsg += 'Is n8n running? Try: n8n start';
+      } else {
+        errorMsg += 'Check the webhook URL in Settings.';
+      }
+    } else {
+      errorMsg += 'Network error. Check URL and connectivity.';
+    }
+    toast(errorMsg, 'error');
+    console.error('Webhook error:', e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Launch Pipeline';
+}
+
+// ── SUBTITLE STYLE ───────────────────────────────────────
+function getSubtitleStyle() {
+  return {
+    font: document.getElementById('sub-font').value,
+    font_size: parseInt(document.getElementById('sub-size').value),
+    primary_color: document.getElementById('sub-color-hex').value,
+    position: document.getElementById('sub-position').value,
+    bold: document.getElementById('sub-bold').checked,
+    italic: document.getElementById('sub-italic').checked
+  };
+}
+
+function updatePreview() {
+  const text = document.getElementById('preview-text');
+  const size = document.getElementById('sub-size').value;
+  const color = document.getElementById('sub-color-hex').value;
+  const pos = document.getElementById('sub-position').value;
+  const font = document.getElementById('sub-font').value;
+  const bold = document.getElementById('sub-bold').checked;
+  const italic = document.getElementById('sub-italic').checked;
+  const scaledSize = Math.round(size * 0.35);
+  text.style.fontFamily = font;
+  text.style.fontSize = scaledSize + 'px';
+  text.style.color = color;
+  text.style.fontWeight = bold ? '900' : 'normal';
+  text.style.fontStyle = italic ? 'italic' : 'normal';
+  text.style.textShadow = 'none';
+  if (pos === 'top') {
+    text.style.top = '20%';
+    text.style.transform = 'none';
+  } else if (pos === 'center') {
+    text.style.top = '50%';
+    text.style.transform = 'translateY(-50%)';
+  } else {
+    text.style.top = '80%';
+    text.style.transform = 'none';
+  }
+}
+
+function syncColor(colorId, hexId) {
+  document.getElementById(hexId).value = document.getElementById(colorId).value.toUpperCase();
+}
+function syncHex(hexId, colorId) {
+  const val = document.getElementById(hexId).value;
+  if (/^#[0-9A-Fa-f]{6}$/.test(val)) document.getElementById(colorId).value = val;
+}
+
+async function loadStylePreset() {
+  const preset = document.getElementById('style-preset').value;
+  if (preset === 'custom') return;
+  const styles = await api('GET', '/caption-styles');
+  if (!styles || !styles[preset]) return;
+  const s = styles[preset];
+  document.getElementById('sub-font').value = s.font || 'Arial Black';
+  document.getElementById('sub-size').value = s.font_size || 88;
+  document.getElementById('sub-size-val').textContent = s.font_size || 88;
+  document.getElementById('sub-color').value = s.primary_color || '#FFFFFF';
+  document.getElementById('sub-color-hex').value = s.primary_color || '#FFFFFF';
+  document.getElementById('sub-bold').checked = s.bold || false;
+  document.getElementById('sub-italic').checked = s.italic || false;
+  document.getElementById('sub-position').value = s.position || 'center';
+  updatePreview();
+}
+
+// ── JOBS ─────────────────────────────────────────────────
+async function loadJobs() {
+  const data = await api('GET', '/jobs');
+  if (!data) return;
+
+  const total = data.length;
+  const complete = data.filter(j => j.status === 'complete').length;
+  const running = data.filter(j => j.status === 'running').length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-complete').textContent = complete;
+  document.getElementById('stat-running').textContent = running;
+  document.getElementById('job-count').textContent = total;
+
+  const list = document.getElementById('job-list');
+  if (!data.length) {
+    list.innerHTML = '<div class="empty-state"><div class="icon"></div><p>No jobs yet</p></div>';
+    return;
+  }
+
+  list.innerHTML = [...data].reverse().map(job => `
+    <div class="job-item">
+      <div class="job-status ${job.status}"></div>
+      <div class="job-info">
+        <div class="job-id">${job.job_id}</div>
+        <div class="job-topic">
+          ${escHtml(job.payload?.channel_id || 'unknown channel')}
+          ${job.payload?.topic_override ? `→ "${escHtml(job.payload.topic_override)}"` : '→ AI topic'}
+        </div>
+        <div class="job-time">${job.created_at?.substring(0,19) || ''}</div>
+        ${(job.outputs || []).length ? `
+          <div style="margin-top:8px; font-size:13px; color:var(--green);">
+            ${job.outputs.length} reel(s) ready
+            ${job.outputs.map(o => `
+              <div style="color:var(--text2); margin-left:8px;">
+                • ${escHtml((o.topic||'').substring(0,50))} (${o.size_mb}MB)
+                <a href="/outputs/${escHtml(job.payload?.channel_id||'')}/${escHtml(o.file?.split('/').pop()||o.file?.split('\\\\').pop()||'')}"
+                   style="color:var(--accent); margin-left:6px;" target="_blank">view</a>
+              </div>`).join('')}
+          </div>
+        ` : ''}
+        ${job.error ? `<div style="color:var(--red); font-size:13px; margin-top:4px;">${escHtml(job.error)}</div>` : ''}
+      </div>
+      <span class="job-badge ${job.status}">${job.status}</span>
+    </div>
+  `).join('');
+}
+
+// ── STYLES PAGE ──────────────────────────────────────────
+async function loadStyles() {
+  const styles = await api('GET', '/caption-styles');
+  const container = document.getElementById('styles-list');
+  if (!styles || !Object.keys(styles).length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>No styles yet</p></div>';
+    return;
+  }
+  container.innerHTML = Object.entries(styles).map(([name, s]) => `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong>${escHtml(name)}</strong>
+          <div class="channel-meta" style="margin-top:6px;">
+            ${escHtml(s.font)} · ${s.font_size}px ·
+            <span style="color:${s.primary_color}; font-weight:700;">Text</span> ·
+            Stroke: ${s.stroke_width}px · ${s.position}
+          </div>
+        </div>
+        <div style="background:#000; padding:8px 16px; border-radius:6px;
+          font-family:${escHtml(s.font)}; font-size:${Math.round(s.font_size*0.25)}px;
+          color:${s.primary_color}; font-weight:900;
+          text-shadow:2px 2px 0 ${s.stroke_color}, -2px -2px 0 ${s.stroke_color};">
+          SAMPLE TEXT
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAddStyle() { document.getElementById('modal-style').classList.add('open'); }
+
+async function saveStyle() {
+  const name = document.getElementById('style-name').value.trim();
+  if (!name) { toast('Enter a style name', 'error'); return; }
+  const style = {
+    font: document.getElementById('new-style-font').value,
+    font_size: parseInt(document.getElementById('new-style-size').value),
+    primary_color: document.getElementById('new-style-color').value.toUpperCase(),
+    stroke_color: document.getElementById('new-style-stroke').value.toUpperCase(),
+    stroke_width: parseInt(document.getElementById('new-style-sw').value),
+    position: document.getElementById('new-style-pos').value
+  };
+  const result = await api('POST', '/caption-styles', { name, style });
+  if (result?.success) {
+    toast('Style saved', 'success');
+    closeModal('modal-style');
+    loadStyles();
+  } else {
+    toast('Failed to save style', 'error');
+  }
+}
+
+// ── UTILITIES ────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function resetForm() {
+  document.getElementById('channel-select').value = '';
+  document.getElementById('topic-override').value = '';
+  document.getElementById('reel-count').value = 1;
+  document.getElementById('reel-count-val').textContent = 1;
+  document.getElementById('channel-info').textContent = 'Select a channel to see details';
+  document.getElementById('style-preset').value = 'custom';
+  document.getElementById('sub-font').value = 'Arial';
+  document.getElementById('sub-size').value = 88;
+  document.getElementById('sub-size-val').textContent = 88;
+  document.getElementById('sub-color').value = '#FFFFFF';
+  document.getElementById('sub-color-hex').value = '#FFFFFF';
+  document.getElementById('sub-bold').checked = false;
+  document.getElementById('sub-italic').checked = false;
+  document.getElementById('sub-position').value = 'center';
+  updatePreview();
+}
+
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icons = { success: '', error: '', info: '' };
+  el.innerHTML = `<span>${icons[type] || ''}</span> ${escHtml(msg)}`;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── GRIDSCAN BACKGROUND ───────────────────────────────────────
+
+let gridScanInstance = null;
+
+function initGridScan() {
+  const container = document.getElementById('grid-background');
+  if (!container || gridScanInstance) return;
+
+  const vert = `
+    varying vec2 vUv;
+    void main(){
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `;
+
+  const frag = `
+precision highp float;
+uniform vec3 iResolution;
+uniform float iTime;
+uniform vec2 uSkew;
+uniform float uTilt;
+uniform float uYaw;
+uniform float uLineThickness;
+uniform vec3 uLinesColor;
+uniform vec3 uScanColor;
+uniform float uGridScale;
+uniform float uLineStyle;
+uniform float uLineJitter;
+uniform float uScanOpacity;
+uniform float uScanDirection;
+uniform float uNoise;
+uniform float uBloomOpacity;
+uniform float uScanGlow;
+uniform float uScanSoftness;
+uniform float uPhaseTaper;
+uniform float uScanDuration;
+uniform float uScanDelay;
+varying vec2 vUv;
+
+uniform float uScanStarts[8];
+uniform float uScanCount;
+
+const int MAX_SCANS = 8;
+
+float smoother01(float a, float b, float x){
+  float t = clamp((x - a) / max(1e-5, (b - a)), 0.0, 1.0);
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord)
+{
+    vec2 p = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
+    vec3 ro = vec3(0.0);
+    vec3 rd = normalize(vec3(p, 2.0));
+    float cR = cos(uTilt), sR = sin(uTilt);
+    rd.xy = mat2(cR, -sR, sR, cR) * rd.xy;
+    float cY = cos(uYaw), sY = sin(uYaw);
+    rd.xz = mat2(cY, -sY, sY, cY) * rd.xz;
+    vec2 skew = clamp(uSkew, vec2(-0.7), vec2(0.7));
+    rd.xy += skew * rd.z;
+    vec3 color = vec3(0.0);
+    float minT = 1e20;
+    float gridScale = max(1e-5, uGridScale);
+    float fadeStrength = 2.0;
+    vec2 gridUV = vec2(0.0);
+    float hitIsY = 1.0;
+    
+    for (int i = 0; i < 4; i++) {
+        float isY = float(i < 2);
+        float pos = mix(-0.2, 0.2, float(i)) * isY + mix(-0.5, 0.5, float(i - 2)) * (1.0 - isY);
+        float num = pos - (isY * ro.y + (1.0 - isY) * ro.x);
+        float den = isY * rd.y + (1.0 - isY) * rd.x;
+        float t = num / den;
+        vec3 h = ro + rd * t;
+        float depthBoost = smoothstep(0.0, 3.0, h.z);
+        h.xy += skew * 0.15 * depthBoost;
+        bool use = t > 0.0 && t < minT;
+        gridUV = use ? mix(h.zy, h.xz, isY) / gridScale : gridUV;
+        minT = use ? t : minT;
+        hitIsY = use ? isY : hitIsY;
+    }
+    
+    vec3 hit = ro + rd * minT;
+    float dist = length(hit - ro);
+    float jitterAmt = clamp(uLineJitter, 0.0, 1.0);
+    if (jitterAmt > 0.0) {
+        vec2 j = vec2(sin(gridUV.y * 2.7 + iTime * 1.8), cos(gridUV.x * 2.3 - iTime * 1.6)) * (0.15 * jitterAmt);
+        gridUV += j;
+    }
+    
+    float fx = fract(gridUV.x);
+    float fy = fract(gridUV.y);
+    float ax = min(fx, 1.0 - fx);
+    float ay = min(fy, 1.0 - fy);
+    float wx = fwidth(gridUV.x);
+    float wy = fwidth(gridUV.y);
+    float halfPx = max(0.0, uLineThickness) * 0.5;
+    float tx = halfPx * wx;
+    float ty = halfPx * wy;
+    float aax = wx;
+    float aay = wy;
+    float lineX = 1.0 - smoothstep(tx, tx + aax, ax);
+    float lineY = 1.0 - smoothstep(ty, ty + aay, ay);
+    
+    if (uLineStyle > 0.5) {
+        float dashRepeat = 4.0;
+        float dashDuty = 0.5;
+        float vy = fract(gridUV.y * dashRepeat);
+        float vx = fract(gridUV.x * dashRepeat);
+        float dashMaskY = step(vy, dashDuty);
+        float dashMaskX = step(vx, dashDuty);
+        if (uLineStyle < 1.5) {
+            lineX *= dashMaskY;
+            lineY *= dashMaskX;
+        } else {
+            float dotRepeat = 6.0;
+            float dotWidth = 0.18;
+            float cy = abs(fract(gridUV.y * dotRepeat) - 0.5);
+            float cx = abs(fract(gridUV.x * dotRepeat) - 0.5);
+            float dotMaskY = 1.0 - smoothstep(dotWidth, dotWidth + fwidth(gridUV.y * dotRepeat), cy);
+            float dotMaskX = 1.0 - smoothstep(dotWidth, dotWidth + fwidth(gridUV.x * dotRepeat), cx);
+            lineX *= dotMaskY;
+            lineY *= dotMaskX;
+        }
+    }
+    
+    float primaryMask = max(lineX, lineY);
+    vec2 gridUV2 = (hitIsY > 0.5 ? hit.xz : hit.zy) / gridScale;
+    
+    if (jitterAmt > 0.0) {
+        vec2 j2 = vec2(cos(gridUV2.y * 2.1 - iTime * 1.4), sin(gridUV2.x * 2.5 + iTime * 1.7)) * (0.15 * jitterAmt);
+        gridUV2 += j2;
+    }
+    
+    float fx2 = fract(gridUV2.x);
+    float fy2 = fract(gridUV2.y);
+    float ax2 = min(fx2, 1.0 - fx2);
+    float ay2 = min(fy2, 1.0 - fy2);
+    float wx2 = fwidth(gridUV2.x);
+    float wy2 = fwidth(gridUV2.y);
+    float tx2 = halfPx * wx2;
+    float ty2 = halfPx * wy2;
+    float aax2 = wx2;
+    float aay2 = wy2;
+    float lineX2 = 1.0 - smoothstep(tx2, tx2 + aax2, ax2);
+    float lineY2 = 1.0 - smoothstep(ty2, ty2 + aay2, ay2);
+    
+    if (uLineStyle > 0.5) {
+        float dashRepeat2 = 4.0;
+        float dashDuty2 = 0.5;
+        float vy2m = fract(gridUV2.y * dashRepeat2);
+        float vx2m = fract(gridUV2.x * dashRepeat2);
+        float dashMaskY2 = step(vy2m, dashDuty2);
+        float dashMaskX2 = step(vx2m, dashDuty2);
+        if (uLineStyle < 1.5) {
+            lineX2 *= dashMaskY2;
+            lineY2 *= dashMaskX2;
+        } else {
+            float dotRepeat2 = 6.0;
+            float dotWidth2 = 0.18;
+            float cy2 = abs(fract(gridUV2.y * dotRepeat2) - 0.5);
+            float cx2 = abs(fract(gridUV2.x * dotRepeat2) - 0.5);
+            float dotMaskY2 = 1.0 - smoothstep(dotWidth2, dotWidth2 + fwidth(gridUV2.y * dotRepeat2), cy2);
+            float dotMaskX2 = 1.0 - smoothstep(dotWidth2, dotWidth2 + fwidth(gridUV2.x * dotRepeat2), cx2);
+            lineX2 *= dotMaskY2;
+            lineY2 *= dotMaskX2;
+        }
+    }
+    
+    float altMask = max(lineX2, lineY2);
+    float edgeDistX = min(abs(hit.x - (-0.5)), abs(hit.x - 0.5));
+    float edgeDistY = min(abs(hit.y - (-0.2)), abs(hit.y - 0.2));
+    float edgeDist = mix(edgeDistY, edgeDistX, hitIsY);
+    float edgeGate = 1.0 - smoothstep(gridScale * 0.5, gridScale * 2.0, edgeDist);
+    altMask *= edgeGate;
+    float lineMask = max(primaryMask, altMask);
+    float fade = exp(-dist * fadeStrength);
+    float dur = max(0.05, uScanDuration);
+    float del = max(0.0, uScanDelay);
+    float scanZMax = 2.0;
+    float widthScale = max(0.1, uScanGlow);
+    float sigma = max(0.001, 0.18 * widthScale * uScanSoftness);
+    float sigmaA = sigma * 2.0;
+    float combinedPulse = 0.0;
+    float combinedAura = 0.0;
+    float cycle = dur + del;
+    float tCycle = mod(iTime, cycle);
+    float scanPhase = clamp((tCycle - del) / dur, 0.0, 1.0);
+    float phase = scanPhase;
+    
+    if (uScanDirection > 0.5 && uScanDirection < 1.5) {
+        phase = 1.0 - phase;
+    } else if (uScanDirection > 1.5) {
+        float t2 = mod(max(0.0, iTime - del), 2.0 * dur);
+        phase = (t2 < dur) ? (t2 / dur) : (1.0 - (t2 - dur) / dur);
+    }
+    
+    float scanZ = phase * scanZMax;
+    float dz = abs(hit.z - scanZ);
+    float lineBand = exp(-0.5 * (dz * dz) / (sigma * sigma));
+    float taper = clamp(uPhaseTaper, 0.0, 0.49);
+    float headW = taper;
+    float tailW = taper;
+    float headFade = smoother01(0.0, headW, phase);
+    float tailFade = 1.0 - smoother01(1.0 - tailW, 1.0, phase);
+    float phaseWindow = headFade * tailFade;
+    float pulseBase = lineBand * phaseWindow;
+    combinedPulse += pulseBase * clamp(uScanOpacity, 0.0, 1.0);
+    float auraBand = exp(-0.5 * (dz * dz) / (sigmaA * sigmaA));
+    combinedAura += (auraBand * 0.25) * phaseWindow * clamp(uScanOpacity, 0.0, 1.0);
+    
+    for (int i = 0; i < MAX_SCANS; i++) {
+        if (float(i) >= uScanCount) break;
+        float tActiveI = iTime - uScanStarts[i];
+        float phaseI = clamp(tActiveI / dur, 0.0, 1.0);
+        if (uScanDirection > 0.5 && uScanDirection < 1.5) {
+            phaseI = 1.0 - phaseI;
+        } else if (uScanDirection > 1.5) {
+            phaseI = (phaseI < 0.5) ? (phaseI * 2.0) : (1.0 - (phaseI - 0.5) * 2.0);
+        }
+        float scanZI = phaseI * scanZMax;
+        float dzI = abs(hit.z - scanZI);
+        float lineBandI = exp(-0.5 * (dzI * dzI) / (sigma * sigma));
+        float headFadeI = smoother01(0.0, headW, phaseI);
+        float tailFadeI = 1.0 - smoother01(1.0 - tailW, 1.0, phaseI);
+        float phaseWindowI = headFadeI * tailFadeI;
+        combinedPulse += lineBandI * phaseWindowI * clamp(uScanOpacity, 0.0, 1.0);
+        float auraBandI = exp(-0.5 * (dzI * dzI) / (sigmaA * sigmaA));
+        combinedAura += (auraBandI * 0.25) * phaseWindowI * clamp(uScanOpacity, 0.0, 1.0);
+    }
+    
+    float lineVis = lineMask;
+    vec3 gridCol = uLinesColor * lineVis * fade;
+    vec3 scanCol = uScanColor * combinedPulse;
+    vec3 scanAura = uScanColor * combinedAura;
+    color = gridCol + scanCol + scanAura;
+    float n = fract(sin(dot(gl_FragCoord.xy + vec2(iTime * 123.4), vec2(12.9898, 78.233))) * 43758.5453123);
+    color += (n - 0.5) * uNoise;
+    color = clamp(color, 0.0, 1.0);
+    float alpha = clamp(max(lineVis, combinedPulse), 0.0, 1.0);
+    float gx = 1.0 - smoothstep(tx * 2.0, tx * 2.0 + aax * 2.0, ax);
+    float gy = 1.0 - smoothstep(ty * 2.0, ty * 2.0 + aay * 2.0, ay);
+    float halo = max(gx, gy) * fade;
+    alpha = max(alpha, halo * clamp(uBloomOpacity, 0.0, 1.0));
+    fragColor = vec4(color, alpha);
+}
+
+void main(){
+  vec4 c;
+  mainImage(c, vUv * iResolution.xy);
+  gl_FragColor = c;
+}
+  `;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.autoClear = false;
+  renderer.setClearColor(0x000000, 0);
+  container.appendChild(renderer.domElement);
+
+  const uniforms = {
+    iResolution: { value: new THREE.Vector3(window.innerWidth, window.innerHeight, renderer.getPixelRatio()) },
+    iTime: { value: 0 },
+    uSkew: { value: new THREE.Vector2(0, 0) },
+    uTilt: { value: 0 },
+    uYaw: { value: 0 },
+    uLineThickness: { value: 1 },
+    uLinesColor: { value: new THREE.Color('#EF4444').convertSRGBToLinear() },
+    uScanColor: { value: new THREE.Color('#EAB308').convertSRGBToLinear() },
+    uGridScale: { value: 0.1 },
+    uLineStyle: { value: 0 },
+    uLineJitter: { value: 0.1 },
+    uScanOpacity: { value: 0.4 },
+    uNoise: { value: 0.01 },
+    uBloomOpacity: { value: 0 },
+    uScanGlow: { value: 0.5 },
+    uScanSoftness: { value: 2 },
+    uPhaseTaper: { value: 0.9 },
+    uScanDuration: { value: 2.0 },
+    uScanDelay: { value: 2.0 },
+    uScanDirection: { value: 2 },
+    uScanStarts: { value: new Array(8).fill(0) },
+    uScanCount: { value: 0 }
+  };
+
+  const material = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: vert,
+    fragmentShader: frag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false
+  });
+
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+  scene.add(quad);
+
+  const onResize = () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    material.uniforms.iResolution.value.set(window.innerWidth, window.innerHeight, renderer.getPixelRatio());
+  };
+  window.addEventListener('resize', onResize);
+
+  const animate = () => {
+    material.uniforms.iTime.value = performance.now() / 1000;
+    renderer.clear(true, true, true);
+    renderer.render(scene, camera);
+    gridScanInstance.rafId = requestAnimationFrame(animate);
+  };
+
+  gridScanInstance = {
+    renderer, material, quad, scene, camera, animate, rafId: null,
+    dispose: () => {
+      if (gridScanInstance.rafId) cancelAnimationFrame(gridScanInstance.rafId);
+      window.removeEventListener('resize', onResize);
+      material.dispose();
+      quad.geometry.dispose();
+      renderer.dispose();
+      renderer.forceContextLoss();
+      if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+      gridScanInstance = null;
+    }
+  };
+
+  gridScanInstance.rafId = requestAnimationFrame(animate);
+}
+
+// ── INIT ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initGridScan();
+  checkApi();
+  loadChannels();
+  updatePreview();
+
+  // ── TYPING ANIMATION ────────────────────────────────────
+  function initTypingAnimation() {
+    const textElement = document.getElementById('typing-text');
+    const cursorElement = document.getElementById('typing-cursor');
+    const fullText = 'Generate Reels for Social Media';
+    const typingSpeed = 50;
+    const deletingSpeed = 30;
+    const pauseDuration = 4000;
+    
+    let displayedText = '';
+    let currentCharIndex = 0;
+    let isDeleting = false;
+
+    function animateTyping() {
+      if (isDeleting) {
+        if (displayedText === '') {
+          isDeleting = false;
+          currentCharIndex = 0;
+          setTimeout(animateTyping, pauseDuration);
+        } else {
+          displayedText = displayedText.slice(0, -1);
+          textElement.textContent = displayedText;
+          setTimeout(animateTyping, deletingSpeed);
+        }
+      } else {
+        if (currentCharIndex < fullText.length) {
+          displayedText += fullText[currentCharIndex];
+          textElement.textContent = displayedText;
+          currentCharIndex++;
+          setTimeout(animateTyping, typingSpeed);
+        } else {
+          setTimeout(() => {
+            isDeleting = true;
+            animateTyping();
+          }, pauseDuration);
+        }
+      }
+    }
+
+    // Show cursor and start animation
+    cursorElement.style.display = 'inline-block';
+    
+    // Animate cursor blinking
+    gsap.to(cursorElement, {
+      opacity: 0,
+      duration: 0.5,
+      repeat: -1,
+      yoyo: true,
+      ease: 'power2.inOut'
+    });
+
+    animateTyping();
+  }
+
+  // Start typing animation when page loads
+  initTypingAnimation();
+
+  setInterval(() => {
+    // Only ping Flask health silently — not the n8n webhook
+    api('GET', '/health').then(result => {
+      const el = document.getElementById('api-status');
+      const dot = document.getElementById('status-dot');
+      if (result && result.status === 'ok') {
+        el.textContent = 'connected';
+        el.style.color = 'var(--green)';
+        dot.style.background = 'var(--green)';
+        document.getElementById('job-count').textContent = result.jobs || 0;
+      } else {
+        el.textContent = 'offline';
+        el.style.color = 'var(--red)';
+        dot.style.background = 'var(--red)';
+      }
+    });
+    if (document.getElementById('page-jobs').classList.contains('active')) loadJobs();
+  }, 5000);
+});
+</script>
+</body>
+</html>
