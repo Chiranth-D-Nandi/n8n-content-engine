@@ -47,6 +47,7 @@ class Settings(BaseModel):
     # Whisper BentoML Service URL
     WHISPER_SERVICE_URL: str = Field(default_factory=lambda: os.getenv("WHISPER_SERVICE_URL", "http://localhost:3000"))
     WHISPER_LOCAL_FALLBACK: bool = Field(default_factory=lambda: os.getenv("WHISPER_LOCAL_FALLBACK", "true").lower() == "true")
+    LOW_MEMORY_MODE: bool = Field(default_factory=lambda: os.getenv("LOW_MEMORY_MODE", "true").lower() == "true")
     
     # Video Generation Gateway
     # Backends: MOCK, REAL_REMOTE, OPTIONAL_LOCAL

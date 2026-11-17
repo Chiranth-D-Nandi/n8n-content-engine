@@ -99,11 +99,12 @@ class PipelineService:
                 script=script
             )
 
-            # 5. Stage: Subtitles (Whisper BentoML Microservice)
+            # 5. Stage: Subtitles (Whisper BentoML Microservice / Aligned)
             subtitles_path = self._stage_subtitles_generation(
                 job_id=job_id,
                 channel=channel,
-                audio_path=audio_path
+                audio_path=audio_path,
+                script=script
             )
 
             # 6. Stage: Video Composition (FFmpeg)
@@ -333,15 +334,18 @@ class PipelineService:
                     self.job_repo.record_stage(job_id, "video_generation", "failed", duration, str(e))
                     raise
 
-    def _stage_subtitles_generation(self, job_id: str, channel: dict, audio_path: Path) -> Path:
+    def _stage_subtitles_generation(self, job_id: str, channel: dict, audio_path: Path, script: dict = None) -> Path:
         stage_start = time.time()
         self.job_repo.update_job_status(job_id=job_id, status=JobStatus.RUNNING, stage=PipelineStage.SUBTITLES, progress=75)
         
         with self.tracer.start_as_current_span("stage.subtitles_generation") as span:
             span.set_attribute("stage", "subtitles_generation")
             try:
-                # Transcribe via Whisper BentoML Microservice
-                words = self.whisper_client.transcribe(audio_path=audio_path, language="en")
+                # Transcribe via Whisper BentoML Microservice or aligned fallback
+                text_hint = None
+                if script:
+                    text_hint = script.get("full_script") or f"{script.get('hook', '')}. {script.get('body', '')}. {script.get('cta', '')}."
+                words = self.whisper_client.transcribe(audio_path=audio_path, language="en", text_hint=text_hint)
                 
                 subtitle_path = Path("temp") / f"{job_id}_subs.ass"
                 subtitle_path.parent.mkdir(parents=True, exist_ok=True)

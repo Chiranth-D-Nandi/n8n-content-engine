@@ -3,7 +3,7 @@ services:
     name: matiks-content-engine
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 2 --timeout 300 -b 0.0.0.0:$PORT api:app
+    startCommand: gunicorn -w 1 --threads 4 --timeout 300 -b 0.0.0.0:$PORT api:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -12,6 +12,8 @@ services:
       - key: VIDEO_BACKEND
         value: MOCK
       - key: CELERY_ALWAYS_EAGER
+        value: "true"
+      - key: LOW_MEMORY_MODE
         value: "true"
       - key: DATABASE_PATH
         value: /tmp/matiks.db
