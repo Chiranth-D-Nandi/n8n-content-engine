@@ -18,6 +18,13 @@ def get_job(job_id: str):
     return jsonify(job_service.get_job(job_id))
 
 
+@jobs_bp.route("/jobs/<job_id>", methods=["DELETE"])
+def delete_job(job_id: str):
+    job_service = JobService()
+    success = job_service.delete_job(job_id)
+    return jsonify({"success": success, "job_id": job_id})
+
+
 @jobs_bp.route("/status/<job_id>", methods=["GET"])
 def get_job_status(job_id: str):
     """

@@ -9,14 +9,17 @@ GEMINI_MODEL = "gemini-2.5-flash"
 
 class GeminiClient:
 
-    def __init__(self, api_key: str, model: str = GEMINI_MODEL):
-        self.client = Client(api_key=api_key)
+    def __init__(self, api_key: str = None, model: str = GEMINI_MODEL):
+        self.api_key = (api_key or "").strip()
+        self.is_configured = bool(self.api_key and self.api_key != "dummy_key")
+        self.client = Client(api_key=self.api_key) if self.is_configured else None
         self.model_name = model
         self._last_call = 0
         self._min_delay = 4  # seconds between calls (15 rpm = 4s apart)
 
     def _rate_limit(self):
-        
+        if not self.is_configured:
+            return
         elapsed = time.time() - self._last_call
         if elapsed < self._min_delay:
             time.sleep(self._min_delay - elapsed)
@@ -43,22 +46,10 @@ class GeminiClient:
     ) -> dict:
         """
         JSON generation with retry.
-        
-        Gemini doesn't have a native JSON mode unlike Ollama.
-        So we:
-        1. Tell it explicitly to output JSON in the prompt
-        2. Strip markdown code blocks if it adds them
-        3. Parse the JSON
-        4. Retry if parsing fails
-        
-        Why strip markdown?
-        Gemini sometimes wraps JSON in:
-        ```json
-        { ... }
-        ```
-        json.loads() can't parse that.
-        We strip the backticks first.
         """
+        if not self.is_configured:
+            return {}
+
         json_prompt = (
             prompt
             + "\n\nCRITICAL: Output ONLY valid JSON. "

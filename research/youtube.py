@@ -9,9 +9,14 @@ class YouTubeScraper:
     Scrapes trending YouTube Shorts for a given niche.
     """
 
-    def __init__(self, api_key: str):
-        self.youtube = build('youtube', 'v3', developerKey=api_key)
+    def __init__(self, api_key: str = None):
+        self.youtube = None
         self.quota_used = 0
+        if api_key and api_key.strip() and api_key != "dummy_key":
+            try:
+                self.youtube = build('youtube', 'v3', developerKey=api_key.strip())
+            except Exception as e:
+                print(f"[YouTube] Warning: failed to initialize client: {e}")
 
     def get_trending_shorts(
         self,
@@ -22,6 +27,8 @@ class YouTubeScraper:
         """
         Get trending Shorts for a niche.
         """
+        if not self.youtube:
+            return []
         published_after = (
             datetime.utcnow() - timedelta(days=days_back)
         ).strftime('%Y-%m-%dT%H:%M:%SZ')

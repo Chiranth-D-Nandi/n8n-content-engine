@@ -53,7 +53,39 @@ class JobRepository(BaseRepository):
             job["poll_url"] = f"/jobs/{job_id}"
             return job
 
+    def clean_orphaned_jobs(self, timeout_seconds: int = 600):
+        """Mark jobs stuck in running for longer than timeout_seconds as failed."""
+        now = datetime.utcnow()
+        with self.transaction() as conn:
+            cursor = conn.execute("SELECT job_id, started_at, created_at FROM jobs WHERE status = 'running'")
+            for row in cursor.fetchall():
+                ts_str = row["started_at"] or row["created_at"]
+                if ts_str:
+                    try:
+                        clean_ts = ts_str.replace("Z", "+00:00").split("+")[0]
+                        ts = datetime.fromisoformat(clean_ts)
+                        elapsed = (now - ts).total_seconds()
+                        if elapsed > timeout_seconds:
+                            conn.execute(
+                                """
+                                UPDATE jobs SET status = 'failed', stage = 'failed',
+                                error = 'Pipeline execution timed out or was interrupted. Please retry.',
+                                error_type = 'TimeoutError', completed_at = ?
+                                WHERE job_id = ?
+                                """,
+                                (now.isoformat(), row["job_id"]),
+                            )
+                    except Exception:
+                        pass
+
+    def delete_job(self, job_id: str) -> bool:
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM job_stages WHERE job_id = ?", (job_id,))
+            cursor = conn.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
+            return cursor.rowcount > 0
+
     def list_jobs(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        self.clean_orphaned_jobs()
         with self.transaction() as conn:
             cursor = conn.execute(
                 "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",

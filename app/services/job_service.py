@@ -33,12 +33,22 @@ class JobService:
         trace_carrier = {}
         inject_trace_context(trace_carrier)
         
-        # Dispatch Celery async task
-        generate_reel_pipeline_task.delay(
-            job_id=job_id,
-            payload=payload,
-            trace_context=trace_carrier
-        )
+        # Dispatch Celery async task (in background thread when eager to never block Gunicorn)
+        from app.core.celery_app import celery_app
+        if celery_app.conf.task_always_eager:
+            import threading
+            thread = threading.Thread(
+                target=generate_reel_pipeline_task.delay,
+                args=(job_id, payload, trace_carrier),
+                daemon=True
+            )
+            thread.start()
+        else:
+            generate_reel_pipeline_task.delay(
+                job_id=job_id,
+                payload=payload,
+                trace_context=trace_carrier
+            )
         
         return {
             "job_id": job_id,
@@ -55,6 +65,9 @@ class JobService:
 
     def list_jobs(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         return self.repo.list_jobs(limit=limit, offset=offset)
+
+    def delete_job(self, job_id: str) -> bool:
+        return self.repo.delete_job(job_id)
 
     def get_stats(self) -> Dict[str, int]:
         return self.repo.get_stats()

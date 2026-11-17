@@ -82,6 +82,7 @@ class WhisperClient:
         ML_INFERENCE_REQUESTS.labels(model="whisper", backend="local_fallback").inc()
         
         try:
+            os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
             from faster_whisper import WhisperModel
             if self._local_model is None:
                 logger.info("Initializing fallback local faster-whisper model (singleton)...")

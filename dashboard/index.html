@@ -1160,9 +1160,22 @@ async function loadJobs() {
         ` : ''}
         ${job.error ? `<div style="color:var(--red); font-size:13px; margin-top:4px;">${escHtml(job.error)}</div>` : ''}
       </div>
-      <span class="job-badge ${statusClass}">${escHtml(job.status)}</span>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+        <span class="job-badge ${statusClass}">${escHtml(job.status)}</span>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:11px; color:var(--text); border-color:var(--border);" onclick="deleteJob('${escHtml(job.job_id)}')">✕ Delete</button>
+      </div>
     </div>
   `}).join('');
+}
+
+async function deleteJob(jobId) {
+  try {
+    await api('DELETE', `/jobs/${jobId}`);
+    toast('Job deleted', 'success');
+    loadJobs();
+  } catch (e) {
+    toast('Failed to delete job', 'error');
+  }
 }
 
 // ── STYLES PAGE ──────────────────────────────────────────

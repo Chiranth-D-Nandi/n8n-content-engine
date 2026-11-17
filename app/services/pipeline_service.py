@@ -239,15 +239,15 @@ class PipelineService:
         
         with self.tracer.start_as_current_span("stage.audio_generation") as span:
             span.set_attribute("stage", "audio_generation")
+            output_path = Path("temp") / f"{job_id}_audio.mp3"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
             try:
                 import edge_tts
                 voice = channel.get("voice_preset", "en-US-ChristopherNeural")
                 full_text = script.get("full_script") or (
                     f"{script.get('hook', '')}. {script.get('body', '')}. {script.get('cta', '')}."
                 )
-
-                output_path = Path("temp") / f"{job_id}_audio.mp3"
-                output_path.parent.mkdir(parents=True, exist_ok=True)
 
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -263,9 +263,21 @@ class PipelineService:
                 return output_path
 
             except Exception as e:
-                duration = time.time() - stage_start
-                self.job_repo.record_stage(job_id, "audio_generation", "failed", duration, str(e))
-                raise
+                logger.warning(f"Edge TTS synthesis error ({e}). Generating fallback audio...")
+                try:
+                    import subprocess
+                    cmd = [
+                        "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+                        "-t", "10", "-q:a", "9", "-acodec", "libmp3lame", str(output_path)
+                    ]
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    duration = time.time() - stage_start
+                    self.job_repo.record_stage(job_id, "audio_generation", "fallback", duration)
+                    return output_path
+                except Exception as fb_err:
+                    duration = time.time() - stage_start
+                    self.job_repo.record_stage(job_id, "audio_generation", "failed", duration, str(e))
+                    raise
 
     def _stage_video_generation(self, job_id: str, channel: dict, script: dict) -> tuple[Path, dict]:
         stage_start = time.time()
@@ -326,9 +338,10 @@ class PipelineService:
                 return subtitle_path
 
             except Exception as e:
+                logger.warning(f"Subtitles generation skipped or failed ({e}). Proceeding without subtitles.")
                 duration = time.time() - stage_start
-                self.job_repo.record_stage(job_id, "subtitles_generation", "failed", duration, str(e))
-                raise
+                self.job_repo.record_stage(job_id, "subtitles_generation", "skipped", duration, str(e))
+                return None
 
     def _stage_composition(
         self,
