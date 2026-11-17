@@ -53,7 +53,7 @@ class JobRepository(BaseRepository):
             job["poll_url"] = f"/jobs/{job_id}"
             return job
 
-    def clean_orphaned_jobs(self, timeout_seconds: int = 600):
+    def clean_orphaned_jobs(self, timeout_seconds: int = 180):
         """Mark jobs stuck in running for longer than timeout_seconds as failed."""
         now = datetime.utcnow()
         with self.transaction() as conn:

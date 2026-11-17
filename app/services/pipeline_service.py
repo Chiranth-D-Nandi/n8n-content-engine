@@ -218,9 +218,29 @@ class PipelineService:
                         topic = topic_data["topic"]
 
                     self.job_repo.update_job_status(job_id=job_id, status=JobStatus.RUNNING, stage=PipelineStage.SCRIPT, progress=30)
-                    script = loop.run_until_complete(
-                        generator.generate_script(channel, topic_data, user_keyword=topic_override)
-                    )
+                    try:
+                        script = loop.run_until_complete(
+                            asyncio.wait_for(
+                                generator.generate_script(channel, topic_data, user_keyword=topic_override),
+                                timeout=15.0
+                            )
+                        )
+                    except Exception as gen_err:
+                        logger.warning(f"Script generation fallback triggered ({gen_err}). Generating fallback script...")
+                        script = generator._fallback_script(
+                            topic=topic,
+                            duration=channel.get("duration_seconds", 60),
+                            reel_style_name=channel.get("reel_style", "documentary")
+                        )
+                        try:
+                            script_id = generator.db.store_script(
+                                channel_id=channel["id"],
+                                topic=topic,
+                                script=script
+                            )
+                            script["id"] = script_id
+                        except Exception:
+                            pass
                 finally:
                     loop.close()
 
@@ -254,7 +274,9 @@ class PipelineService:
                 asyncio.set_event_loop(loop)
                 try:
                     communicate = edge_tts.Communicate(full_text, voice)
-                    loop.run_until_complete(communicate.save(str(output_path)))
+                    loop.run_until_complete(
+                        asyncio.wait_for(communicate.save(str(output_path)), timeout=12.0)
+                    )
                 finally:
                     loop.close()
 
