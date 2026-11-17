@@ -51,6 +51,7 @@ class Settings(BaseModel):
     # Video Generation Gateway
     # Backends: MOCK, REAL_REMOTE, OPTIONAL_LOCAL
     VIDEO_BACKEND: str = Field(default_factory=lambda: os.getenv("VIDEO_BACKEND", "MOCK").upper())
+    ALLOW_VIDEO_FALLBACK: bool = Field(default_factory=lambda: os.getenv("ALLOW_VIDEO_FALLBACK", "true").lower() == "true")
     VIDEO_GATEWAY_URL: str = Field(default_factory=lambda: os.getenv("VIDEO_GATEWAY_URL", "http://localhost:8000"))
     HF_TOKEN: Optional[str] = Field(default_factory=lambda: os.getenv("HF_TOKEN", os.getenv("HUGGINGFACE_TOKEN")))
     HF_SPACE_URL: Optional[str] = Field(default_factory=lambda: os.getenv("HF_SPACE_URL"))

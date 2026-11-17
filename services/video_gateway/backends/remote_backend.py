@@ -42,7 +42,11 @@ class RemoteGpuVideoBackend(VideoBackend):
         if self._gradio_client is None:
             try:
                 from gradio_client import Client
-                self._gradio_client = Client(self.endpoint_url, hf_token=self.api_token)
+                token = self.api_token if self.api_token else None
+                try:
+                    self._gradio_client = Client(self.endpoint_url, token=token)
+                except TypeError:
+                    self._gradio_client = Client(self.endpoint_url, hf_token=token)
             except Exception as e:
                 logger.warning(f"Failed to instantiate gradio_client for {self.endpoint_url}: {e}")
                 self._gradio_client = None
@@ -146,10 +150,13 @@ class RemoteGpuVideoBackend(VideoBackend):
                     )
                 
                 # Poll status
+                poll_start = time.time()
                 while not job.done():
                     time.sleep(2)
                     status = job.status()
                     logger.debug(f"[ZeroGPU] Status: {status.code}")
+                    if time.time() - poll_start > 180:
+                        raise TimeoutError("Remote ZeroGPU inference timed out after 180s waiting for generation")
 
                 raw_result = job.result()
                 video_result_path = None
@@ -209,7 +216,12 @@ class RemoteGpuVideoBackend(VideoBackend):
                         f"GPU_BACKEND_UNAVAILABLE: Remote ZeroGPU inference failed ({e})."
                     )
 
-        # Fallback raw HTTP request to custom GPU endpoint
+        # Fallback raw HTTP request to custom GPU endpoint (non-Gradio)
+        if "hf.space" in self.endpoint_url or "huggingface.co" in self.endpoint_url:
+            raise BackendUnavailableException(
+                f"GPU_BACKEND_UNAVAILABLE: Hugging Face ZeroGPU Space ({self.endpoint_url}) client was unable to connect."
+            )
+
         try:
             headers = {"Authorization": f"Bearer {self.api_token}"} if self.api_token else {}
             response = requests.post(

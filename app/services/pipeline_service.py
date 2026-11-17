@@ -303,9 +303,35 @@ class PipelineService:
                 return Path(result.video_path), result.dict()
 
             except Exception as e:
-                duration = time.time() - stage_start
-                self.job_repo.record_stage(job_id, "video_generation", "failed", duration, str(e))
-                raise
+                if settings.ALLOW_VIDEO_FALLBACK:
+                    logger.warning(
+                        f"Video generation via {self.video_gateway.backend_type} failed ({e}). "
+                        f"Falling back to canvas generator..."
+                    )
+                    try:
+                        from services.video_gateway.backends.mock_backend import MockVideoBackend
+                        fallback_backend = MockVideoBackend()
+                        result = fallback_backend.generate(
+                            prompt=video_prompt,
+                            output_path=output_path,
+                            num_frames=49,
+                            num_inference_steps=30
+                        )
+                        duration = time.time() - stage_start
+                        STAGE_DURATION_SECONDS.labels(stage="video_generation").observe(duration)
+                        self.job_repo.record_stage(
+                            job_id, "video_generation", "fallback", duration,
+                            f"Fell back from {self.video_gateway.backend_type}: {e}"
+                        )
+                        return Path(result.video_path), result.dict()
+                    except Exception as fb_err:
+                        duration = time.time() - stage_start
+                        self.job_repo.record_stage(job_id, "video_generation", "failed", duration, str(fb_err))
+                        raise
+                else:
+                    duration = time.time() - stage_start
+                    self.job_repo.record_stage(job_id, "video_generation", "failed", duration, str(e))
+                    raise
 
     def _stage_subtitles_generation(self, job_id: str, channel: dict, audio_path: Path) -> Path:
         stage_start = time.time()
