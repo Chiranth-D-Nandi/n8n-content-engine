@@ -12,8 +12,11 @@ def health():
     """
     Health check returning shape expected by dashboard & monitoring.
     """
-    job_service = JobService()
-    stats = job_service.get_stats()
+    try:
+        job_service = JobService()
+        stats = job_service.get_stats()
+    except Exception:
+        stats = {}
     
     return jsonify({
         "status": "ok",

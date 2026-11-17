@@ -473,12 +473,12 @@
           <div class="card-title">n8n Webhook</div>
           <div class="form-group">
             <label>Webhook URL</label>
-            <input type="text" id="webhook-url" value="http://localhost:5678/webhook/matiks-reel">
+            <input type="text" id="webhook-url" value="https://n8n-content-engine-xt5c.onrender.com/webhook/matiks-reel">
             <div class="hint">Your n8n webhook endpoint (typically port 5678) or direct API endpoint</div>
           </div>
           <div class="form-group">
             <label>API Base URL</label>
-            <input type="text" id="api-url" value="http://localhost:5000"
+            <input type="text" id="api-url" value="https://n8n-content-engine-xt5c.onrender.com"
               onchange="API_BASE=this.value; checkApi(true)">
           </div>
           <button class="btn btn-secondary" onclick="checkApi(true)">Test Connection</button>
@@ -752,19 +752,24 @@ async function checkApi(manual = false) {
       }
       if (manual) toast('Backend API connected ✓', 'success');
     } else {
-      throw new Error('bad response');
+      if (!el || el.textContent !== 'connected') {
+        throw new Error('bad response');
+      }
     }
   } catch (e) {
-    if (el) {
-      el.textContent = 'waking up...';
-      el.style.color = 'var(--yellow)';
+    // Never revert back to 'waking up' if we already successfully connected
+    if (!el || el.textContent !== 'connected') {
+      if (el) {
+        el.textContent = 'waking up...';
+        el.style.color = 'var(--yellow)';
+      }
+      if (dot) dot.style.background = 'var(--yellow)';
+      if (bEl) {
+        bEl.textContent = 'Render waking...';
+        bEl.style.color = 'var(--yellow)';
+      }
+      if (manual) toast('Render backend is spinning up, please wait a few seconds...', 'info');
     }
-    if (dot) dot.style.background = 'var(--yellow)';
-    if (bEl) {
-      bEl.textContent = 'Render waking...';
-      bEl.style.color = 'var(--yellow)';
-    }
-    if (manual) toast('Render backend is spinning up, please wait a few seconds...', 'info');
   }
 
   // Only test webhook explicitly when user clicks Test Connection
