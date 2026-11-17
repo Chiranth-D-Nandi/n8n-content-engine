@@ -228,18 +228,22 @@ OUTPUT: JSON only, no other text or markdown.
         duration: int,
         reel_style_name: str
     ) -> dict:
-        #fallback for script generation
+        hook = f"Nobody is talking about this side of {topic}, but the reality will shock you."
+        body = (
+            f"Researchers recently uncovered three surprising facts that change everything we thought we knew. "
+            f"First, recent behavioral patterns reveal unprecedented problem-solving abilities never observed before. "
+            f"Second, adaptive intelligence develops exponentially faster in complex natural environments. "
+            f"And finally, new field studies prove this is already transforming the entire ecosystem around us."
+        )
+        cta = "Drop your thoughts in the comments below, and follow for more mind-blowing discoveries."
+        full_script = f"{hook} {body} {cta}"
+
         return {
-            'hook': f"Nobody is talking about this side of {topic}...",
-            'body': f"Here is what you need to know. " * 3,
-            'cta': "Follow for more content like this.",
-            'full_script': (
-                f"Nobody is talking about this side of {topic}. "
-                f"Here is what you need to know. Follow for more."
-            ),
-            'video_prompt': (
-                f"generate visuals of {topic},ensure no text in visuals"
-            ),
+            'hook': hook,
+            'body': body,
+            'cta': cta,
+            'full_script': full_script,
+            'video_prompt': f"Cinematic detailed close-up shot of {topic}, high quality documentary style, natural lighting",
             'editing_notes': {
                 'music_mood': 'dramatic cinematic',
                 'text_style': 'pop_scale',
