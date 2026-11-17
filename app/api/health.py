@@ -8,6 +8,8 @@ health_bp = Blueprint("health", __name__)
 
 
 @health_bp.route("/health", methods=["GET"])
+@health_bp.route("/api/status", methods=["GET"])
+@health_bp.route("/status", methods=["GET"])
 def health():
     """
     Health check returning shape expected by dashboard & monitoring.

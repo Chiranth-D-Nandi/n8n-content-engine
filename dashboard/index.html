@@ -742,7 +742,8 @@ async function checkApi(manual = false) {
   const bEl = document.getElementById('backend-status');
 
   try {
-    const result = await api('GET', '/health');
+    let result = await api('GET', '/api/status');
+    if (!result) result = await api('GET', '/health');
     if (result && result.status === 'ok') {
       markApiConnected(result.video_backend || 'REAL_REMOTE');
       const jobCountEl = document.getElementById('job-count');
