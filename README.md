@@ -1,6 +1,7 @@
 # Matiks Content Engine — Production-Grade Asynchronous ML System
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7.svg)](https://n8n-content-engine-xt5c.onrender.com/)
+[![Live Web UI](https://img.shields.io/badge/Live%20UI-Vercel-black.svg?logo=vercel)](https://n8n-content-engine.vercel.app/)
+[![API Gateway](https://img.shields.io/badge/API%20Gateway-Render-46E3B7.svg)](https://n8n-content-engine-xt5c.onrender.com/)
 [![Continuous Integration](https://github.com/Chiranth-D-Nandi/n8n-content-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Chiranth-D-Nandi/n8n-content-engine/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![Docker Compose](https://img.shields.io/badge/docker--compose-ready-2496ED.svg)](docker-compose.yml)
@@ -18,8 +19,8 @@ The entire system is deployed live on online cloud infrastructure with authentic
 
 | Service | Endpoint / URL | Status | Description |
 | :--- | :--- | :--- | :--- |
-| **Interactive Web UI** | **[https://n8n-content-engine-xt5c.onrender.com/](https://n8n-content-engine-xt5c.onrender.com/)** | `LIVE` | Interactive Three.js WebGL dashboard with real-time status & video player |
-| **Production API Gateway** | **[https://n8n-content-engine-xt5c.onrender.com/health](https://n8n-content-engine-xt5c.onrender.com/health)** | `HTTP 200` | Automated health probe (`video_backend: REAL_REMOTE`) |
+| **Interactive Web UI (Instant Edge CDN)** | **[https://n8n-content-engine.vercel.app/](https://n8n-content-engine.vercel.app/)** | `LIVE` | Interactive Three.js WebGL dashboard on Vercel Edge Network (no cold start) |
+| **Production API Gateway (Render)** | **[https://n8n-content-engine-xt5c.onrender.com/health](https://n8n-content-engine-xt5c.onrender.com/health)** | `HTTP 200` | Automated health probe (`video_backend: REAL_REMOTE`) |
 | **Readiness Probe** | **[https://n8n-content-engine-xt5c.onrender.com/health/ready](https://n8n-content-engine-xt5c.onrender.com/health/ready)** | `HTTP 200` | Subsystem check across DB, task queue, and video gateway |
 | **Prometheus Metrics** | **[https://n8n-content-engine-xt5c.onrender.com/metrics](https://n8n-content-engine-xt5c.onrender.com/metrics)** | `ACTIVE` | Scrapes HTTP durations, in-flight requests, and queue length |
 | **Remote GPU Orchestrator** | Multi-Tier ZeroGPU Failover | `OPERATIONAL` | Descending-reservation packing across LTX-2.3, Wan2.2 & CogVideoX-2B |
