@@ -277,7 +277,7 @@
 </svg></span> Settings
       </button>
     </nav>
-    <div class="status-bar" onclick="checkApi()" style="cursor:pointer;" title="Click to refresh connection">
+    <div class="status-bar" onclick="checkApi(true)" style="cursor:pointer;" title="Click to refresh connection">
       <span class="status-dot" id="status-dot"></span>
       API <span id="api-status">connecting...</span>
       <div style="margin-top:6px;">Jobs: <span id="job-count">0</span></div>
@@ -479,9 +479,9 @@
           <div class="form-group">
             <label>API Base URL</label>
             <input type="text" id="api-url" value="http://localhost:5000"
-              onchange="API_BASE=this.value; checkApi()">
+              onchange="API_BASE=this.value; checkApi(true)">
           </div>
-          <button class="btn btn-secondary" onclick="checkApi()">Test Connection</button>
+          <button class="btn btn-secondary" onclick="checkApi(true)">Test Connection</button>
         </div>
         <div class="card" style="background: rgba(0, 212, 170, 0.05); border-color: rgba(0, 212, 170, 0.2);">
           <div class="card-title">Connection Debugging</div>
@@ -709,72 +709,61 @@ async function api(method, path, body) {
   }
 }
 
-//n8n wehbook testing
-async function checkApi() {
+// ── API HEALTH & STATUS ────────────────────────────────────
+async function checkApi(manual = false) {
   const el = document.getElementById('api-status');
   const dot = document.getElementById('status-dot');
   const bEl = document.getElementById('backend-status');
-  const webhookUrl = document.getElementById('webhook-url')?.value;
 
-  // Test Flask API health
   try {
     const result = await api('GET', '/health');
     if (result && result.status === 'ok') {
-      el.textContent = 'connected';
-      el.style.color = 'var(--green)';
-      dot.style.background = 'var(--green)';
-      document.getElementById('job-count').textContent = result.jobs || 0;
-      if (bEl && result.video_backend) {
-        bEl.textContent = result.video_backend;
-        bEl.style.color = result.video_backend === 'REAL_REMOTE' ? 'var(--green)' : 'var(--yellow)';
+      if (el) {
+        el.textContent = 'connected';
+        el.style.color = 'var(--green)';
+      }
+      if (dot) dot.style.background = 'var(--green)';
+      const jobCountEl = document.getElementById('job-count');
+      if (jobCountEl) jobCountEl.textContent = result.jobs || 0;
+      if (bEl) {
+        bEl.textContent = result.video_backend || 'REAL_REMOTE';
+        bEl.style.color = 'var(--green)';
       }
       if (channels.length === 0) {
         loadChannels();
       }
+      if (manual) toast('Backend API connected ✓', 'success');
     } else {
       throw new Error('bad response');
     }
   } catch (e) {
-    el.textContent = 'offline';
-    el.style.color = 'var(--red)';
-    dot.style.background = 'var(--red)';
-    if (bEl && (bEl.textContent === 'checking...' || bEl.textContent === 'connecting...')) {
+    if (el) {
+      el.textContent = 'waking up...';
+      el.style.color = 'var(--yellow)';
+    }
+    if (dot) dot.style.background = 'var(--yellow)';
+    if (bEl) {
       bEl.textContent = 'Render waking...';
       bEl.style.color = 'var(--yellow)';
     }
+    if (manual) toast('Render backend is spinning up, please wait a few seconds...', 'info');
   }
 
-  // Update backend mode from /health/ready
-  try {
-    const readyResult = await api('GET', '/health/ready');
-    if (bEl && readyResult) {
-      const mode = readyResult.video_backend || readyResult.video_backend_mode || readyResult?.video_gateway?.backend || 'MOCK';
-      bEl.textContent = mode;
-      if (mode === 'REAL_REMOTE') {
-        bEl.style.color = 'var(--green)';
-      } else if (mode === 'MOCK') {
-        bEl.style.color = 'var(--yellow)';
-      } else {
-        bEl.style.color = 'var(--accent)';
+  // Only test webhook explicitly when user clicks Test Connection
+  if (manual) {
+    const webhookUrl = document.getElementById('webhook-url')?.value;
+    if (webhookUrl) {
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ test: true })
+        });
+        toast('n8n webhook reachable ✓', 'success');
+      } catch (e) {
+        toast('n8n webhook unreachable', 'error');
       }
     }
-  } catch (e) {}
-
-  // Test n8n webhook URL with POST (n8n webhooks only respond to POST)
-  if (webhookUrl) {
-    try {
-      const res = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test: true })
-      });
-      // n8n returns 200 even in test mode - any response means it's reachable
-      toast('n8n webhook reachable ✓', 'success');
-    } catch (e) {
-      toast('n8n webhook unreachable — Is n8n running on port 5678?', 'error');
-    }
-  } else if (!webhookUrl) {
-    toast('Webhook URL not configured', 'info');
   }
 }
 
@@ -1625,8 +1614,8 @@ document.addEventListener('DOMContentLoaded', () => {
   loadChannels();
   updatePreview();
 
-  // Auto-poll status every 5 seconds so UI connects instantly when Render wakes up
-  setInterval(checkApi, 5000);
+  // Auto-poll status every 10 seconds so UI connects cleanly without flooding Render
+  setInterval(() => checkApi(false), 10000);
 
   // ── TYPING ANIMATION ────────────────────────────────────
   function initTypingAnimation() {
@@ -1686,37 +1675,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTypingAnimation();
 
   setInterval(() => {
-    // Ping Flask health silently
-    api('GET', '/health').then(result => {
-      const el = document.getElementById('api-status');
-      const dot = document.getElementById('status-dot');
-      if (result && result.status === 'ok') {
-        el.textContent = 'connected';
-        el.style.color = 'var(--green)';
-        dot.style.background = 'var(--green)';
-        document.getElementById('job-count').textContent = result.jobs || 0;
-      } else {
-        el.textContent = 'offline';
-        el.style.color = 'var(--red)';
-        dot.style.background = 'var(--red)';
-      }
-    });
-    // Silently check backend mode
-    api('GET', '/health/ready').then(readyResult => {
-      const bEl = document.getElementById('backend-status');
-      if (bEl && readyResult) {
-        const mode = readyResult.video_backend || readyResult.video_backend_mode || readyResult?.video_gateway?.backend || 'MOCK';
-        bEl.textContent = mode;
-        if (mode === 'REAL_REMOTE') {
-          bEl.style.color = 'var(--green)';
-        } else if (mode === 'MOCK') {
-          bEl.style.color = 'var(--yellow)';
-        } else {
-          bEl.style.color = 'var(--accent)';
-        }
-      }
-    }).catch(() => {});
-    if (document.getElementById('page-jobs').classList.contains('active')) loadJobs();
+    if (document.getElementById('page-jobs')?.classList.contains('active')) loadJobs();
   }, 5000);
 });
 </script>
