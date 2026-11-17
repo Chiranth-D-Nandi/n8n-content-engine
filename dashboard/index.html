@@ -277,7 +277,7 @@
 </svg></span> Settings
       </button>
     </nav>
-    <div class="status-bar">
+    <div class="status-bar" onclick="checkApi()" style="cursor:pointer;" title="Click to refresh connection">
       <span class="status-dot" id="status-dot"></span>
       API <span id="api-status">connecting...</span>
       <div style="margin-top:6px;">Jobs: <span id="job-count">0</span></div>
@@ -713,6 +713,7 @@ async function api(method, path, body) {
 async function checkApi() {
   const el = document.getElementById('api-status');
   const dot = document.getElementById('status-dot');
+  const bEl = document.getElementById('backend-status');
   const webhookUrl = document.getElementById('webhook-url')?.value;
 
   // Test Flask API health
@@ -723,10 +724,12 @@ async function checkApi() {
       el.style.color = 'var(--green)';
       dot.style.background = 'var(--green)';
       document.getElementById('job-count').textContent = result.jobs || 0;
-      const bEl = document.getElementById('backend-status');
       if (bEl && result.video_backend) {
         bEl.textContent = result.video_backend;
         bEl.style.color = result.video_backend === 'REAL_REMOTE' ? 'var(--green)' : 'var(--yellow)';
+      }
+      if (channels.length === 0) {
+        loadChannels();
       }
     } else {
       throw new Error('bad response');
@@ -735,12 +738,15 @@ async function checkApi() {
     el.textContent = 'offline';
     el.style.color = 'var(--red)';
     dot.style.background = 'var(--red)';
+    if (bEl && (bEl.textContent === 'checking...' || bEl.textContent === 'connecting...')) {
+      bEl.textContent = 'Render waking...';
+      bEl.style.color = 'var(--yellow)';
+    }
   }
 
   // Update backend mode from /health/ready
   try {
     const readyResult = await api('GET', '/health/ready');
-    const bEl = document.getElementById('backend-status');
     if (bEl && readyResult) {
       const mode = readyResult.video_backend || readyResult.video_backend_mode || readyResult?.video_gateway?.backend || 'MOCK';
       bEl.textContent = mode;
@@ -1618,6 +1624,9 @@ document.addEventListener('DOMContentLoaded', () => {
   checkApi();
   loadChannels();
   updatePreview();
+
+  // Auto-poll status every 5 seconds so UI connects instantly when Render wakes up
+  setInterval(checkApi, 5000);
 
   // ── TYPING ANIMATION ────────────────────────────────────
   function initTypingAnimation() {
