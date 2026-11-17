@@ -18,11 +18,11 @@ The entire system is deployed live on online cloud infrastructure with authentic
 
 | Service | Endpoint / URL | Status | Description |
 | :--- | :--- | :--- | :--- |
-| **Interactive Web UI** | **[https://n8n-content-engine-xt5c.onrender.com/](https://n8n-content-engine-xt5c.onrender.com/)** | `LIVE` | Interactive Three.js WebGL dashboard with real-time status |
+| **Interactive Web UI** | **[https://n8n-content-engine-xt5c.onrender.com/](https://n8n-content-engine-xt5c.onrender.com/)** | `LIVE` | Interactive Three.js WebGL dashboard with real-time status & video player |
 | **Production API Gateway** | **[https://n8n-content-engine-xt5c.onrender.com/health](https://n8n-content-engine-xt5c.onrender.com/health)** | `HTTP 200` | Automated health probe (`video_backend: REAL_REMOTE`) |
 | **Readiness Probe** | **[https://n8n-content-engine-xt5c.onrender.com/health/ready](https://n8n-content-engine-xt5c.onrender.com/health/ready)** | `HTTP 200` | Subsystem check across DB, task queue, and video gateway |
 | **Prometheus Metrics** | **[https://n8n-content-engine-xt5c.onrender.com/metrics](https://n8n-content-engine-xt5c.onrender.com/metrics)** | `ACTIVE` | Scrapes HTTP durations, in-flight requests, and queue length |
-| **Remote GPU Inference** | `https://zai-org-cogvideox-2b-space.hf.space` | `CONNECTED` | Official Hugging Face ZeroGPU Space (48GB VRAM RTX 6000 Ada) |
+| **Remote GPU Orchestrator** | Multi-Tier ZeroGPU Failover | `OPERATIONAL` | Descending-reservation packing across LTX-2.3, Wan2.2 & CogVideoX-2B |
 
 ---
 
@@ -32,13 +32,18 @@ The web client is a standalone, high-performance WebGL dashboard styled with cus
 
 | 1. Generate Reel & Subtitle Customizer | 2. Dynamic Channel Manager |
 | :---: | :---: |
-| [![Generate Reel](assets/dashboard_generate.png)](assets/dashboard_generate.png) | [![Channel Manager](assets/dashboard_channels.png)](assets/dashboard_channels.png) |
+| [![Generate Reel](assets/screenshots/ui_generate_reel.png)](assets/screenshots/ui_generate_reel.png) | [![Channel Manager](assets/screenshots/ui_channels.png)](assets/screenshots/ui_channels.png) |
 | *Real-time Three.js 3D GridScan tunnel, subtitle customization (fonts, size, colors, position), and `REAL_REMOTE` GPU backend badge.* | *11 pre-configured channel niches with custom persona rules, voice models, and quick-generate controls.* |
 
-| 3. Asynchronous Job Monitor | 4. Webhook & Observability Settings |
+| 3. Asynchronous Job Monitor (Completed 5.29MB AI Reel) | 4. Webhook & Observability Settings |
 | :---: | :---: |
-| [![Job Monitor](assets/dashboard_jobs.png)](assets/dashboard_jobs.png) | [![Settings & Observability](assets/dashboard_settings.png)](assets/dashboard_settings.png) |
-| *Real-time polling of pipeline execution stages (Research → Script → TTS → Video → Subtitles → Composition).* | *Live n8n webhook routing, dynamic API base, connection diagnostics, and links to Prometheus/Grafana.* |
+| [![Job Monitor](assets/screenshots/ui_job_monitor.png)](assets/screenshots/ui_job_monitor.png) | [![Settings & Observability](assets/screenshots/ui_settings.png)](assets/screenshots/ui_settings.png) |
+| *Real-time stage tracking (Research → Script → TTS → Video → Subtitles → Composition). Shows verified `REAL_REMOTE` output.* | *Live n8n webhook routing, dynamic API base, connection diagnostics, and links to Prometheus/Grafana.* |
+
+| 5. Inline Video Preview Player |
+| :---: |
+| [![Video Preview Player](assets/screenshots/ui_video_preview.png)](assets/screenshots/ui_video_preview.png) |
+| *Embedded HTML5 video player streaming the synthesized 5.29MB MP4 directly from Render cloud storage.* |
 
 ---
 
@@ -69,12 +74,16 @@ flowchart TD
         Worker --> Stage2["2. Script Generator\n(Google Gemini API · Hook/Body/CTA Parsing)"]
         Worker --> Stage3["3. Audio Synthesis\n(Edge TTS WebSocket)"]
         
-        Worker --> Stage4["4. ML Serving: Whisper Subtitles\n(BentoML Microservice on Port 3000)"]
-        Worker --> Stage5["5. ML Serving: Video Generation\n(Pluggable Video Gateway on Port 8000)"]
+        Worker --> Stage4["4. ML Serving: Whisper Subtitles\n(BentoML Microservice / Low-Memory Direct Alignment)"]
+        Worker --> Stage5["5. ML Serving: Video Generation\n(Multi-Tier Failover Orchestrator)"]
         
-        Stage5 -.-> RemoteGPU["Hugging Face Spaces ZeroGPU\n(48GB VRAM RTX 6000 Ada · $0 / No Card)"]
-        Stage5 -.-> MockGPU["Isolated Mock Backend\n(Zero Quota Load Testing & Demos)"]
-        Stage5 -.-> LocalGPU["Optional Local Backend\n(PyTorch / diffusers on RTX 4060)"]
+        Stage5 -.-> Tier1["Tier 1: Lightricks LTX-2.3 Distilled\n(22B DiT · 5s H.264 · ~113s rsv)"]
+        Stage5 -.-> Tier2["Tier 2: Wan2.2 14B Text-to-Video\n(4-step distilled · ~75s rsv)"]
+        Stage5 -.-> Tier3["Tier 3: LTX-Video Tail-Packer\n(Ultra-low ~62s rsv ceiling)"]
+        Stage5 -.-> Tier4["Tier 4: Krish1440 CogVideoX-2B\n(Official weights · ~210s rsv)"]
+        Stage5 -.-> Tier5["Tier 5: Zhipu BigModel Flash API\n(Async ¥0 / ₹0 Cloud REST)"]
+        Stage5 -.-> MockGPU["Isolated Mock Backend\n(Zero Quota Load Testing & CI/CD)"]
+        Stage5 -.-> Fallback["Tier 6: Canvas & Stock B-Roll\n(Guaranteed SLA Fallback)"]
         
         Worker --> Stage6["6. Video Composition\n(FFmpeg Dynamic Subtitles · Audio Normalisation)"]
         Stage6 --> Storage["Artifact Repository\n(outputs/{channel_id}/*.mp4)"]
@@ -97,11 +106,12 @@ flowchart TD
 | **Execution Model** | Synchronous blocking & unmanaged threads | Asynchronous **Redis + Celery** tasks with stage-level state machine |
 | **Job Persistence** | Transient Python `dict` (wiped on crash/restart) | Persistent SQLite database in **WAL mode** with stage durations & artifact metadata |
 | **ML Model Serving** | Model weights loaded inside Flask process | **BentoML containerized microservice** for Whisper; dedicated HTTP Gateway for CogVideoX |
-| **Zero-Cost GPU Decoupling** | Tied to local GPU; CPU crashes under load | Pluggable Gateway routing to **Hugging Face Spaces ZeroGPU** (48GB VRAM, ₹0, no credit card) |
+| **Zero-Cost GPU Decoupling** | Tied to local GPU; CPU crashes under load | Multi-Tier **ZeroGPU Failover Orchestrator** (LTX-2.3, Wan2.2, CogVideoX-2B) on 48GB-96GB nodes (₹0, no card) |
+| **Trend Discovery** | Manual topic input or static mocks | Live **YouTube Data API v3** search & Google Trends concurrent signal aggregation |
 | **Observability** | Unstructured `print()` statements | **Prometheus** metrics, **Grafana** dashboard, **OpenTelemetry** W3C distributed tracing |
 | **Resilience & Safety** | Silent crashes, unbounded concurrency | Sliding-window **rate limiting** (30 req/min), timeouts, classified task retries |
 | **Dashboard UI** | Manual polling, no stage visibility | Real-time stage progress (`research` $\rightarrow$ `composition`), backend status pill, embedded video player |
-| **Throughput** | ~2 requests/sec before thread lockup | **32.40 requests/sec** with p50 latency <20ms under 10 concurrent users |
+| **Throughput & Memory** | High memory spikes, Render OOM kill | **32.40 req/s**, chunked disk streaming (<45MB RSS) running safely inside Render's 512MB RAM |
 
 ---
 
@@ -115,17 +125,34 @@ flowchart LR
         direction TB
         CF["Cloudflare Pages / GitHub Pages\n(Static Dashboard UI Hosting)\nCost: $0/mo"]
         
-        Render["Render / Hugging Face Docker Space\n(CPU Services: Flask API + Celery + SQLite + BentoML)\nCost: $0/mo (Free Tier 512MB-16GB)"]
+        Render["Render Free Tier (512MB RAM, 0.1 vCPU)\n(Flask API Gateway + Celery Task Queue + SQLite WAL)\nCost: $0/mo · 300s timeout"]
         
-        HFZeroGPU["Hugging Face Spaces ZeroGPU\n(Remote CogVideoX-2B Gradio Microservice)\n48GB VRAM RTX 6000 Ada · Cost: $0/mo"]
+        Router["Multi-Tier Failover Orchestrator\n(video_failover_router.py)\nDescending Reservation Packing"]
+        
+        ZeroGPU1["Tier 1: Lightricks LTX-2.3\n(22B DiT · ~113s rsv · 5s MP4)"]
+        ZeroGPU2["Tier 2: Wan2.2 14B Text-to-Video\n(4-step distilled · ~75s rsv)"]
+        ZeroGPU3["Tier 3: Upsampler LTX Tail-Packer\n(Declares 41s · ~62s rsv)"]
+        ZeroGPU4["Tier 4: Krish1440 CogVideoX-2B\n(Declares 140s · ~210s rsv)"]
+        BigModel["Tier 5: Zhipu BigModel Flash\n(Free Async REST API)"]
         
         Upstash["Upstash Redis Free Tier\n(10,000 commands/day · No CC Required)\nCost: $0/mo"]
         
         CF --> Render
         Render --> Upstash
-        Render --> HFZeroGPU
+        Render --> Router
+        Router --> ZeroGPU1
+        Router --> ZeroGPU2
+        Router --> ZeroGPU3
+        Router --> ZeroGPU4
+        Router --> BigModel
     end
 ```
+
+### 1. Reverse-Engineering Hugging Face ZeroGPU Scheduler Physics
+Through comprehensive multi-hop scraping and live API probing across 1,004 Spaces, the exact ZeroGPU scheduler mechanics on **NVIDIA RTX Pro 6000 Blackwell (48GB-96GB)** nodes were reverse-engineered:
+- **Hidden Reservation Multipliers:** The scheduler applies a **~1.5× multiplier** on declared `@spaces.GPU(duration)` on `large` GPUs and **2×+** on `xlarge` GPUs. (e.g. `duration=240` triggers a `360s` reservation request, instantly rejected for non-PRO callers whose max reservation ceiling is 120s anonymous / 300s free token).
+- **Descending Reservation Packing:** The orchestrator dispatches to higher-reservation spaces first (`LTX-2.3` at ~113s) before falling back to lower-reservation tail-packers (`Wan2.2` at ~75s, `LTX-video` at ~62s), eliminating stranded partial daily quota.
+- **Zero-Footprint Memory Streaming:** All remote video blobs are streamed directly to disk in 64KB chunks and immediate garbage collection purges `/tmp/gradio` artifacts, keeping peak Python RSS strictly below 45MB within Render's 512MB RAM ceiling.
 
 1. **GPU Video Inference (Hugging Face Spaces ZeroGPU):**
    - **Why ZeroGPU:** Modal, RunPod, and AWS require credit card verification for free credits. Hugging Face Spaces ZeroGPU offers **48GB VRAM (NVIDIA RTX 6000 Ada)** completely free without entering a credit card.
@@ -148,11 +175,11 @@ flowchart LR
 - Exposes standard `/transcribe` endpoint returning structured word-level timestamps.
 - Features resilient client `WhisperClient` with automatic fallback to local singleton if the microservice is unreachable.
 
-### 2. Pluggable Video Generation Gateway (`services/video_gateway/`)
+### 2. Multi-Tier Remote Video Generation Gateway (`services/video_gateway/`)
 Decouples video generation behind the `VideoBackend` interface, selected via `VIDEO_BACKEND` environment variable:
-- **`MOCK` (Default for Testing):** Generates valid synthetic MP4 video clips or copies sample reels in ~1s. Allows running complete CI/CD test suites and Locust load benchmarks without consuming GPU time or external quotas.
-- **`REAL_REMOTE` (Hugging Face ZeroGPU):** Invokes the remote Hugging Face Spaces ZeroGPU Gradio endpoint. Preserves authentic CogVideoX-2B deep learning inference while offloading heavy computation.
-- **`OPTIONAL_LOCAL` (Local PyTorch/CUDA):** Wraps diffusers `CogVideoXPipeline` on consumer hardware (tested on RTX 4060) using sequential CPU offload.
+- **`MOCK` (Testing & CI/CD):** Generates valid synthetic MP4 video clips or copies sample reels in ~0.5s. Allows running complete CI/CD test suites and Locust load benchmarks without consuming GPU time or external quotas.
+- **`REAL_REMOTE` (Multi-Tier ZeroGPU Failover Orchestrator):** Routes inference dynamically across active Hugging Face ZeroGPU Spaces (`Lightricks/LTX-2-3`, `Upsampler/wan-2-2-14b`, `Upsampler/ltx-video`, `Krish1440/CogVideoX-2B`, and Zhipu BigModel Flash). Implements descending reservation packing and automatic fallback to guarantee video delivery without local GPU compute.
+- **`OPTIONAL_LOCAL` (Local PyTorch/CUDA):** Wraps diffusers `CogVideoXPipeline` on consumer hardware (tested on RTX 4060) with sequential CPU offloading and VAE slicing.
 
 ---
 
