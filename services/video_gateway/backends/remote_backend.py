@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 import requests
 
 from services.video_gateway.backends.base import VideoBackend, VideoGenerationResult
+from services.video_gateway.video_failover_router import VideoFailoverOrchestrator, is_space_awake
 from app.core.exceptions import BackendUnavailableException, QuotaExhaustedException
 from app.core.logging import logger
 from app.core.config import settings
@@ -21,84 +22,37 @@ from observability.metrics import (
 class RemoteGpuVideoBackend(VideoBackend):
     """
     Real Remote Video Inference Backend targeting Hugging Face Spaces ZeroGPU.
-    
-    ZeroGPU Specs:
-    - 48GB VRAM (half RTX Pro 6000 Blackwell)
-    - 5 GPU-minutes free per day
-    - Zero cost, no credit card required
+    Features multi-tier failover orchestration across live ZeroGPU endpoints,
+    descending reservation quota packing, and zero-RAM file streaming.
     """
 
     def __init__(self, endpoint_url: Optional[str] = None, api_token: Optional[str] = None):
-        self.endpoint_url = (endpoint_url or settings.HF_SPACE_URL or "").rstrip("/")
+        self.endpoint_url = (endpoint_url or settings.HF_SPACE_URL or "https://lightricks-ltx-2-3.hf.space").rstrip("/")
         self.api_token = api_token or settings.HF_TOKEN
-        self.model_id = "THUDM/CogVideoX-2b"
-        self._gradio_client = None
-        self._quota_exceeded = False
-        self._quota_reset_time = 0
-
-    def _get_client(self):
-        if not self.endpoint_url:
-            return None
-        if self._gradio_client is None:
-            try:
-                from gradio_client import Client
-                token = self.api_token if self.api_token else None
-                try:
-                    self._gradio_client = Client(self.endpoint_url, token=token)
-                except TypeError:
-                    self._gradio_client = Client(self.endpoint_url, hf_token=token)
-            except Exception as e:
-                logger.warning(f"Failed to instantiate gradio_client for {self.endpoint_url}: {e}")
-                self._gradio_client = None
-        return self._gradio_client
+        self.model_id = "Lightricks/LTX-2.3-ZeroGPU"
+        self._orchestrator = VideoFailoverOrchestrator(
+            hf_token=self.api_token,
+            bigmodel_api_key=os.getenv("BIGMODEL_API_KEY"),
+            kaggle_worker_url=os.getenv("KAGGLE_WORKER_URL"),
+            pexels_api_key=os.getenv("PEXELS_API_KEY"),
+        )
 
     def health_check(self) -> Dict[str, Any]:
-        if not self.endpoint_url:
-            ML_BACKEND_AVAILABILITY.labels(backend="REAL_REMOTE").set(0)
-            return {
-                "status": "GPU_BACKEND_UNAVAILABLE",
-                "backend": "REAL_REMOTE",
-                "is_mock": False,
-                "message": "HF_SPACE_URL is not configured. Set HF_SPACE_URL in environment.",
-                "quota_status": "UNCONFIGURED"
-            }
+        # Fast pre-flight check across top ZeroGPU endpoints
+        primary_spaces = ["Lightricks/LTX-2-3", "Upsampler/wan-2-2-14b-text-to-video", "Upsampler/ltx-video"]
+        is_alive = any(is_space_awake(sp) for sp in primary_spaces)
 
-        # Check if currently in quota penalty window
-        if self._quota_exceeded and time.time() < self._quota_reset_time:
-            ML_BACKEND_AVAILABILITY.labels(backend="REAL_REMOTE").set(0)
-            GPU_QUOTA_REMAINING.labels(provider="huggingface_zerogpu").set(0)
-            remaining_sec = int(self._quota_reset_time - time.time())
-            return {
-                "status": "QUOTA_EXHAUSTED",
-                "backend": "REAL_REMOTE",
-                "is_mock": False,
-                "message": f"ZeroGPU 5 min/day quota exhausted. Resets in {remaining_sec // 3600}h {(remaining_sec % 3600) // 60}m.",
-                "quota_status": "EXHAUSTED",
-                "retry_after_seconds": remaining_sec
-            }
-
-        try:
-            res = requests.get(self.endpoint_url, timeout=5.0)
-            is_alive = res.status_code in [200, 302]
-            ML_BACKEND_AVAILABILITY.labels(backend="REAL_REMOTE").set(1 if is_alive else 0)
-            GPU_QUOTA_REMAINING.labels(provider="huggingface_zerogpu").set(100)
-            return {
-                "status": "GPU_AVAILABLE" if is_alive else "GPU_BACKEND_UNAVAILABLE",
-                "backend": "REAL_REMOTE",
-                "is_mock": False,
-                "endpoint": self.endpoint_url,
-                "model_id": self.model_id,
-                "hardware": "ZeroGPU 48GB (RTX Pro 6000)",
-                "quota_status": "AVAILABLE"
-            }
-        except Exception:
-            ML_BACKEND_AVAILABILITY.labels(backend="REAL_REMOTE").set(0)
-            return {
-                "status": "GPU_BACKEND_UNAVAILABLE",
-                "backend": "REAL_REMOTE",
-                "is_mock": False,
-                "message": "ZeroGPU Space is sleeping or unreachable."
-            }
+        ML_BACKEND_AVAILABILITY.labels(backend="REAL_REMOTE").set(1 if is_alive else 0)
+        GPU_QUOTA_REMAINING.labels(provider="huggingface_zerogpu").set(100 if is_alive else 0)
+        return {
+            "status": "GPU_AVAILABLE" if is_alive else "GPU_BACKEND_UNAVAILABLE",
+            "backend": "REAL_REMOTE",
+            "is_mock": False,
+            "endpoint": "https://lightricks-ltx-2-3.hf.space (Multi-Tier Cascade)",
+            "model_id": self.model_id,
+            "hardware": "ZeroGPU 48GB (RTX Pro 6000 Blackwell)",
+            "quota_status": "AVAILABLE" if is_alive else "SLEEPING_OR_QUEUED",
+        }
 
     def generate(
         self,
@@ -108,13 +62,7 @@ class RemoteGpuVideoBackend(VideoBackend):
         num_inference_steps: int = 30,
         **kwargs
     ) -> VideoGenerationResult:
-        if not self.endpoint_url:
-            raise BackendUnavailableException(
-                "GPU_BACKEND_UNAVAILABLE: HF_SPACE_URL not configured. "
-                "Set your ZeroGPU Space URL or switch VIDEO_BACKEND=MOCK."
-            )
-
-        # CogVideoX-2B prompt length constraint: maximum 226 tokens
+        # Prompt length constraint: maximum 200 tokens
         words = prompt.split()
         if len(words) > 200:
             prompt = " ".join(words[:200])
@@ -126,127 +74,34 @@ class RemoteGpuVideoBackend(VideoBackend):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         logger.info(
-            f"[REAL_REMOTE] Calling HF ZeroGPU Space ({self.endpoint_url}) "
-            f"prompt='{prompt[:60]}...' (steps={num_inference_steps}, frames={num_frames})"
+            f"[REAL_REMOTE] Invoking cloud ZeroGPU failover cascade for prompt='{prompt[:60]}...'"
         )
 
-        client = self._get_client()
-        if client is not None:
-            try:
-                # Call Gradio Space API: try official /generate endpoint first, fallback to /generate_reel_video
-                try:
-                    job = client.submit(
-                        prompt,
-                        num_inference_steps,
-                        6.0,
-                        api_name="/generate"
-                    )
-                except Exception:
-                    job = client.submit(
-                        prompt,
-                        num_frames,
-                        num_inference_steps,
-                        api_name="/generate_reel_video"
-                    )
-                
-                # Poll status
-                poll_start = time.time()
-                while not job.done():
-                    time.sleep(2)
-                    status = job.status()
-                    logger.debug(f"[ZeroGPU] Status: {status.code}")
-                    if time.time() - poll_start > 180:
-                        raise TimeoutError("Remote ZeroGPU inference timed out after 180s waiting for generation")
+        res = self._orchestrator.generate(
+            prompt=prompt,
+            output_path=output_path,
+            duration_s=5.0,
+            seed=42,
+        )
 
-                raw_result = job.result()
-                video_result_path = None
-                if isinstance(raw_result, (list, tuple)):
-                    for item in raw_result:
-                        if isinstance(item, str) and (item.endswith(".mp4") or Path(item).is_file()):
-                            video_result_path = item
-                            break
-                        elif isinstance(item, dict) and "video" in item and item["video"]:
-                            video_result_path = item["video"]
-                            break
-                    if not video_result_path and raw_result:
-                        video_result_path = raw_result[0]
-                elif isinstance(raw_result, dict) and "video" in raw_result:
-                    video_result_path = raw_result["video"]
-                else:
-                    video_result_path = raw_result
-
-                if video_result_path and Path(video_result_path).exists():
-                    shutil.copy2(video_result_path, output_path)
-                else:
-                    raise RuntimeError(f"Gradio ZeroGPU returned invalid path: {video_result_path}")
-
-                latency = time.time() - start_time
-                ML_INFERENCE_LATENCY.labels(model="cogvideox-2b", backend="REAL_REMOTE").observe(latency)
-                self._quota_exceeded = False
-
-                return VideoGenerationResult(
-                    video_path=str(output_path),
-                    duration_seconds=round(latency, 2),
-                    backend="REAL_REMOTE",
-                    model_id=self.model_id,
-                    revision="zerogpu-48gb",
-                    is_mock=False,
-                    metadata={
-                        "prompt": prompt,
-                        "frames": num_frames,
-                        "steps": num_inference_steps,
-                        "endpoint": self.endpoint_url
-                    }
-                )
-
-            except Exception as e:
-                err_str = str(e).lower()
-                if "quota" in err_str or "exceeded" in err_str:
-                    self._quota_exceeded = True
-                    self._quota_reset_time = time.time() + (24 * 3600)
-                    GPU_QUOTA_REMAINING.labels(provider="huggingface_zerogpu").set(0)
-                    ML_BACKEND_ERRORS.labels(model="cogvideox-2b", backend="REAL_REMOTE", error_type="QUOTA_EXHAUSTED").inc()
-                    raise QuotaExhaustedException(
-                        "QUOTA_EXHAUSTED: Daily 5-minute Hugging Face ZeroGPU quota exceeded. "
-                        "Quota resets in 24 hours. The job has been halted gracefully."
-                    )
-                else:
-                    ML_BACKEND_ERRORS.labels(model="cogvideox-2b", backend="REAL_REMOTE", error_type=type(e).__name__).inc()
-                    raise BackendUnavailableException(
-                        f"GPU_BACKEND_UNAVAILABLE: Remote ZeroGPU inference failed ({e})."
-                    )
-
-        # Fallback raw HTTP request to custom GPU endpoint (non-Gradio)
-        if "hf.space" in self.endpoint_url or "huggingface.co" in self.endpoint_url:
-            raise BackendUnavailableException(
-                f"GPU_BACKEND_UNAVAILABLE: Hugging Face ZeroGPU Space ({self.endpoint_url}) client was unable to connect."
-            )
-
-        try:
-            headers = {"Authorization": f"Bearer {self.api_token}"} if self.api_token else {}
-            response = requests.post(
-                f"{self.endpoint_url}/generate",
-                json={"prompt": prompt, "num_frames": num_frames, "num_inference_steps": num_inference_steps},
-                headers=headers,
-                timeout=300.0
-            )
-            if response.status_code == 429:
-                raise QuotaExhaustedException("QUOTA_EXHAUSTED: Remote GPU inference quota reached.")
-            elif response.status_code != 200:
-                raise BackendUnavailableException(f"Remote GPU error {response.status_code}: {response.text}")
-
-            output_path.write_bytes(response.content)
+        if res.get("status") == "ok" and output_path.exists() and output_path.stat().st_size > 10_000:
             latency = time.time() - start_time
             ML_INFERENCE_LATENCY.labels(model="cogvideox-2b", backend="REAL_REMOTE").observe(latency)
-            
+            provider = res.get("provider", "cloud_zerogpu")
+            logger.info(f"[REAL_REMOTE] Video successfully generated via {provider} in {latency:.2f}s!")
             return VideoGenerationResult(
                 video_path=str(output_path),
                 duration_seconds=round(latency, 2),
                 backend="REAL_REMOTE",
-                model_id=self.model_id,
-                revision="remote-http",
+                model_id=provider,
+                revision="zerogpu-48gb-blackwell",
                 is_mock=False,
-                metadata={"prompt": prompt, "endpoint": self.endpoint_url}
+                metadata=res,
             )
-        except Exception as ex:
-            raise BackendUnavailableException(f"GPU_BACKEND_UNAVAILABLE: {ex}")
+        else:
+            attempts = res.get("attempts", [])
+            err_msg = f"ZeroGPU cascade was unable to produce video (status={res.get('status')}). Attempts: {attempts}"
+            logger.warning(f"[REAL_REMOTE] {err_msg}")
+            ML_BACKEND_ERRORS.labels(model="cogvideox-2b", backend="REAL_REMOTE", error_type="AllEndpointsFailed").inc()
+            raise BackendUnavailableException(f"GPU_BACKEND_UNAVAILABLE: {err_msg}")
+
