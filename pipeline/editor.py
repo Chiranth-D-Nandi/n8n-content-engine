@@ -287,7 +287,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             '-map', '1:a',
             '-c:v', 'libx264',
             '-crf', '23',
-            '-preset', 'fast',
+            '-preset', 'ultrafast',
+            '-threads', '2',
             '-c:a', 'aac',
             '-b:a', '192k',
             '-t', str(audio_duration),  # stop when audio ends

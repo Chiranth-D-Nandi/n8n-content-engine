@@ -59,20 +59,31 @@ class MockVideoBackend(VideoBackend):
         if sample_candidates and sample_candidates[0] != output_path:
             shutil.copy2(sample_candidates[0], output_path)
         else:
-            # Generate a minimal valid 1080x1920 MP4 test pattern using ffmpeg
+            # Generate a minimal valid 1080x1920 MP4 canvas using ultrafast stillimage
             cmd = [
                 "ffmpeg", "-y",
                 "-f", "lavfi",
-                "-i", "testsrc=size=1080x1920:rate=8:duration=5",
+                "-i", "color=c=0x111625:s=1080x1920:d=15:r=24",
                 "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-tune", "stillimage",
                 "-pix_fmt", "yuv420p",
                 str(output_path.resolve())
             ]
             try:
-                subprocess.run(cmd, check=True, capture_output=True, timeout=30)
+                subprocess.run(cmd, check=True, capture_output=True, timeout=60)
             except Exception as e:
-                logger.warning(f"FFmpeg mock generator failed ({e}), writing dummy mp4 placeholder")
-                output_path.write_bytes(b"\x00\x00\x00 ftypisom\x00\x00\x02\x00isomiso2mp41")
+                logger.warning(f"FFmpeg mock generator failed ({e}), retrying with fallback format...")
+                cmd_fb = [
+                    "ffmpeg", "-y",
+                    "-f", "lavfi",
+                    "-i", "color=c=black:s=720x1280:d=10:r=20",
+                    "-c:v", "libx264",
+                    "-preset", "ultrafast",
+                    "-pix_fmt", "yuv420p",
+                    str(output_path.resolve())
+                ]
+                subprocess.run(cmd_fb, check=True, capture_output=True, timeout=60)
                 
         latency = time.time() - start_time
         ML_INFERENCE_LATENCY.labels(model="cogvideox-2b", backend="MOCK").observe(latency)
