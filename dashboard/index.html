@@ -690,11 +690,37 @@ function showPage(name, btn) {
 }
 
 // ── API ──────────────────────────────────────────────────
+function markApiConnected(videoBackend) {
+  const el = document.getElementById('api-status');
+  const dot = document.getElementById('status-dot');
+  const bEl = document.getElementById('backend-status');
+  if (el) {
+    el.textContent = 'connected';
+    el.style.color = 'var(--green)';
+  }
+  if (dot) dot.style.background = 'var(--green)';
+  if (bEl) {
+    if (videoBackend) bEl.textContent = videoBackend;
+    else if (bEl.textContent === 'checking...' || bEl.textContent === 'Render waking...') bEl.textContent = 'REAL_REMOTE';
+    bEl.style.color = 'var(--green)';
+  }
+}
+
+function parseUtcDate(str) {
+  if (!str) return new Date();
+  const s = (str.endsWith('Z') || str.includes('+') || (str.length > 10 && str.lastIndexOf('-') > 10)) ? str : str + 'Z';
+  return new Date(s);
+}
+
 async function api(method, path, body) {
   try {
+    const headers = {};
+    if (body) {
+      headers['Content-Type'] = 'application/json';
+    }
     const res = await fetch(API_BASE + path, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: body ? JSON.stringify(body) : undefined
     });
     if (!res.ok) {
@@ -718,17 +744,9 @@ async function checkApi(manual = false) {
   try {
     const result = await api('GET', '/health');
     if (result && result.status === 'ok') {
-      if (el) {
-        el.textContent = 'connected';
-        el.style.color = 'var(--green)';
-      }
-      if (dot) dot.style.background = 'var(--green)';
+      markApiConnected(result.video_backend || 'REAL_REMOTE');
       const jobCountEl = document.getElementById('job-count');
       if (jobCountEl) jobCountEl.textContent = result.jobs || 0;
-      if (bEl) {
-        bEl.textContent = result.video_backend || 'REAL_REMOTE';
-        bEl.style.color = 'var(--green)';
-      }
       if (channels.length === 0) {
         loadChannels();
       }
@@ -776,6 +794,8 @@ async function loadChannels() {
 
   if (data) channels.push(...data.map(c => ({ ...c, source: 'config' })));
   if (genres) channels.push(...genres.map(g => ({ ...g, source: 'genre' })));
+
+  if (data || genres) markApiConnected();
 
   document.getElementById('channel-count').textContent = channels.length;
   document.getElementById('stat-channels').textContent = channels.length;
@@ -1081,6 +1101,7 @@ function closeVideoModal() {
 async function loadJobs() {
   const data = await api('GET', '/jobs');
   if (!data) return;
+  markApiConnected();
 
   const total = data.length;
   const complete = data.filter(j => j.status === 'complete' || j.status === 'completed').length;
@@ -1100,10 +1121,10 @@ async function loadJobs() {
     const statusClass = (job.status === 'complete' || job.status === 'completed') ? 'complete' : job.status;
     let durationText = '';
     if (job.started_at && job.completed_at) {
-      const diff = ((new Date(job.completed_at) - new Date(job.started_at)) / 1000).toFixed(1);
+      const diff = ((parseUtcDate(job.completed_at) - parseUtcDate(job.started_at)) / 1000).toFixed(1);
       durationText = ` · ${diff}s`;
     } else if (job.started_at && job.status === 'running') {
-      const diff = ((new Date() - new Date(job.started_at)) / 1000).toFixed(0);
+      const diff = Math.max(0, Math.floor((new Date() - parseUtcDate(job.started_at)) / 1000));
       durationText = ` · ${diff}s elapsed`;
     }
 
