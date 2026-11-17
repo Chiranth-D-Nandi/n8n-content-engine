@@ -1171,14 +1171,16 @@ async function loadJobs() {
           <div style="margin-top:8px; font-size:13px; color:var(--green);">
             ${job.outputs.length} reel(s) ready:
             ${job.outputs.map(o => {
-              const filename = escHtml(o.file?.split('/').pop()||o.file?.split('\\\\').pop()||'');
-              const url = `/outputs/${escHtml(job.payload?.channel_id||'')}/${filename}`;
+              const parts = (o.file || '').split(/[/\\]/);
+              const filename = escHtml(parts.pop() || '');
+              const chId = escHtml(job.payload?.channel_id || (parts.length ? parts.pop() : 'animals'));
+              const url = `${API_BASE}/outputs/${chId}/${filename}`;
               const topicEsc = escHtml(o.topic || 'Reel Preview');
               return `
               <div style="color:var(--text2); margin-left:8px; margin-top:4px; display:flex; align-items:center; gap:8px;">
                 <span>• ${escHtml((o.topic||'').substring(0,45))} (${o.size_mb || 0}MB)</span>
                 <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:11px;" onclick="previewReel('${url}', '${topicEsc}')">▶ Preview</button>
-                <a href="${url}" style="color:var(--accent); font-size:12px;" target="_blank">open</a>
+                <a href="${url}" style="color:var(--accent); font-size:12px;" target="_blank" download>open</a>
               </div>`;
             }).join('')}
           </div>
