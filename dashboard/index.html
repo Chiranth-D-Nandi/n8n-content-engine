@@ -669,9 +669,12 @@
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────
+const PROD_RENDER_BACKEND = 'https://n8n-content-engine-xt5c.onrender.com';
 let API_BASE = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http')) 
-  ? window.location.origin 
-  : 'http://localhost:5000';
+  ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('onrender.com')
+      ? window.location.origin 
+      : PROD_RENDER_BACKEND)
+  : PROD_RENDER_BACKEND;
 let channels = [];
 let currentEditChannelId = null;
 
@@ -1599,7 +1602,11 @@ void main(){
 // ── INIT ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   if (window.location && window.location.origin && window.location.origin.startsWith('http')) {
-    API_BASE = window.location.origin;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('onrender.com')) {
+      API_BASE = window.location.origin;
+    } else {
+      API_BASE = PROD_RENDER_BACKEND;
+    }
     const apiInput = document.getElementById('api-url');
     if (apiInput) apiInput.value = API_BASE;
     const webhookInput = document.getElementById('webhook-url');

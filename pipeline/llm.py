@@ -4,7 +4,7 @@ import time
 from google.genai import Client
 
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-flash-latest"
 
 
 class GeminiClient:
